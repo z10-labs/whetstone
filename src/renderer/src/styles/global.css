@@ -1,0 +1,494 @@
+@import './tokens.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--accent-quiet);
+}
+
+/* Scrollbars — thin, unobtrusive */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: padding-box;
+}
+
+/* ---- App shell: three columns ---- */
+.app {
+  display: grid;
+  grid-template-columns: 264px 340px 1fr;
+  height: 100%;
+  background: var(--bg-app);
+}
+
+.col {
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.col--sessions {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--line);
+}
+.col--runs {
+  background: var(--bg-panel-2);
+  border-right: 1px solid var(--line);
+}
+.col--transcript {
+  background: var(--bg-inset);
+}
+
+/* Draggable title strip (macOS hidden-inset chrome) */
+.titlestrip {
+  height: 38px;
+  flex: 0 0 auto;
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-4);
+}
+.titlestrip .brand {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding-left: 60px; /* clear the traffic lights */
+}
+.titlestrip .brand b {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ---- Column headers ---- */
+.col-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+}
+.col-head h2 {
+  margin: 0;
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1;
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.icon-btn:active {
+  transform: scale(0.94);
+}
+
+.scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--sp-3);
+}
+
+/* ---- Session list ---- */
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+.session-row:hover {
+  background: var(--bg-panel-2);
+}
+.session-row.is-active {
+  background: var(--bg-elevated);
+  border-color: var(--line-strong);
+}
+.session-row .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 22%, transparent);
+}
+.session-row .meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.session-row .name {
+  color: var(--text-hi);
+  font-weight: 550;
+  font-size: var(--text-base);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-row .sub {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  margin-top: 2px;
+}
+
+/* ---- Run list ---- */
+.run-card {
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  margin-bottom: var(--sp-3);
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.run-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--status-color, var(--idle));
+}
+.run-card:hover {
+  border-color: var(--line-strong);
+}
+.run-card.is-active {
+  border-color: var(--accent);
+}
+.run-card .title {
+  color: var(--text-hi);
+  font-weight: 550;
+  font-size: var(--text-base);
+  line-height: 1.35;
+}
+.run-card .cwd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  margin-top: var(--sp-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.run-card .row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 2px 8px;
+}
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-color, var(--idle));
+}
+.badge--count {
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+/* ---- Transcript ---- */
+.transcript-head {
+  flex: 0 0 auto;
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg-panel), transparent);
+}
+.transcript-head h1 {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text-hi);
+  font-weight: 600;
+}
+.transcript-head .subline {
+  margin-top: var(--sp-2);
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.transcript-head .path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.stream {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.event {
+  max-width: 780px;
+  animation: rise var(--dur) var(--ease);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.event .who {
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--sp-2);
+  font-weight: 600;
+}
+.event .bubble {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.event--user {
+  align-self: flex-end;
+}
+.event--user .who {
+  text-align: right;
+  color: var(--accent);
+}
+.event--user .bubble {
+  background: var(--accent-quiet);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--line));
+  color: var(--text-hi);
+}
+.event--thinking .bubble {
+  color: var(--text-dim);
+  font-style: italic;
+  background: transparent;
+  border-style: dashed;
+}
+.event--tool .bubble {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-inset);
+}
+.event--tool .tool-name {
+  color: var(--run);
+  font-weight: 600;
+}
+.event--tool pre {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-dim);
+  overflow-x: auto;
+}
+.event--result .bubble {
+  border-color: color-mix(in oklab, var(--ok) 35%, var(--line));
+}
+.event--error .bubble {
+  border-color: color-mix(in oklab, var(--err) 45%, var(--line));
+  color: var(--err);
+}
+
+/* ---- Prompt bar ---- */
+.promptbar {
+  flex: 0 0 auto;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+.promptbar .field {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-end;
+  background: var(--bg-inset);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-2);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.promptbar .field:focus-within {
+  border-color: var(--accent);
+}
+.promptbar textarea {
+  flex: 1 1 auto;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-hi);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  padding: var(--sp-2);
+  max-height: 180px;
+}
+.promptbar textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.btn {
+  border: 1px solid var(--line-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+  font-weight: 550;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.btn:hover {
+  border-color: var(--line-strong);
+  color: var(--text-hi);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1206;
+}
+.btn--primary:hover {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+  color: #1a1206;
+}
+.btn--danger {
+  color: var(--err);
+  border-color: color-mix(in oklab, var(--err) 45%, var(--line));
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Empty states ---- */
+.empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  text-align: center;
+  color: var(--text-faint);
+  padding: var(--sp-6);
+}
+.empty .mark {
+  font-size: 34px;
+  opacity: 0.5;
+}
+.empty h3 {
+  margin: 0;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.empty p {
+  margin: 0;
+  max-width: 340px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.spark {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--run);
+  box-shadow: 0 0 0 0 var(--run);
+  animation: pulse 1.4s infinite;
+}
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--run) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
