@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
   id            TEXT PRIMARY KEY,
   session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   provider      TEXT NOT NULL,
+  mode          TEXT NOT NULL DEFAULT 'sdk',
   external_id   TEXT,
   origin        TEXT NOT NULL DEFAULT 'launched',
   title         TEXT NOT NULL,
@@ -59,6 +60,19 @@ CREATE TABLE IF NOT EXISTS run_events (
 CREATE INDEX IF NOT EXISTS run_events_run_seq_idx ON run_events(run_id, seq);
 `;
 
+/**
+ * Additive, idempotent column migrations for databases created before a column
+ * existed. `CREATE TABLE IF NOT EXISTS` never alters an existing table, so new
+ * columns are added here.
+ */
+async function ensureColumns(client: Client): Promise<void> {
+  const info = await client.execute('PRAGMA table_info(agent_runs)');
+  const columns = new Set(info.rows.map((r) => String(r.name)));
+  if (!columns.has('mode')) {
+    await client.execute("ALTER TABLE agent_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'sdk'");
+  }
+}
+
 export type Db = LibSQLDatabase<typeof schema>;
 
 let dbSingleton: Db | null = null;
@@ -74,6 +88,7 @@ export async function initDb(): Promise<Db> {
 
   const client = createClient({ url: `file:${file}` });
   await client.executeMultiple(BOOTSTRAP_DDL);
+  await ensureColumns(client);
 
   clientSingleton = client;
   dbSingleton = drizzle(client, { schema });

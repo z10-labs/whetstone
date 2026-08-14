@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import type { RunEvent, Session, SessionWithRuns } from '@shared/models';
+import type { RunEvent, RunMode, Session, SessionWithRuns } from '@shared/models';
 
 export function useWhetstone() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -56,16 +56,19 @@ export function useWhetstone() {
     [refreshSessions, selectSession],
   );
 
-  const createRun = useCallback(async () => {
-    const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
-    const cwd = await api.dialog.pickDirectory();
-    if (!cwd) return;
-    const run = await api.runs.create({ sessionId, cwd });
-    await loadSession(sessionId);
-    setSelectedRunId(run.id);
-    setEvents([]);
-  }, [loadSession]);
+  const createRun = useCallback(
+    async (mode: RunMode) => {
+      const sessionId = sessionIdRef.current;
+      if (!sessionId) return;
+      const cwd = await api.dialog.pickDirectory();
+      if (!cwd) return;
+      const run = await api.runs.create({ sessionId, cwd, mode });
+      await loadSession(sessionId);
+      setSelectedRunId(run.id);
+      setEvents([]);
+    },
+    [loadSession],
+  );
 
   const startAgent = useCallback(async (prompt: string) => {
     const runId = runIdRef.current;

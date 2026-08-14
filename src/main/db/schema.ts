@@ -23,6 +23,7 @@ export const agentRuns = sqliteTable(
       .notNull()
       .references(() => sessions.id, { onDelete: 'cascade' }),
     provider: text('provider').notNull(),
+    mode: text('mode').notNull().default('sdk'),
     externalId: text('external_id'),
     origin: text('origin').notNull().default('launched'),
     title: text('title').notNull(),

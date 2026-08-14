@@ -2,10 +2,12 @@ import { useWhetstone } from './state/useWhetstone';
 import { SessionSidebar } from './components/SessionSidebar';
 import { RunColumn } from './components/RunColumn';
 import { Transcript } from './components/Transcript';
+import { TerminalView } from './components/TerminalView';
 import { PromptBar } from './components/PromptBar';
 
 export default function App() {
   const store = useWhetstone();
+  const run = store.selectedRun;
 
   return (
     <div className="app">
@@ -24,8 +26,14 @@ export default function App() {
       />
 
       <main className="col col--transcript">
-        <Transcript run={store.selectedRun} events={store.events} />
-        <PromptBar run={store.selectedRun} onSend={store.startAgent} onCancel={store.cancelAgent} />
+        {run?.mode === 'terminal' ? (
+          <TerminalView key={run.id} run={run} />
+        ) : (
+          <>
+            <Transcript run={run} events={store.events} />
+            <PromptBar run={run} onSend={store.startAgent} onCancel={store.cancelAgent} />
+          </>
+        )}
       </main>
     </div>
   );

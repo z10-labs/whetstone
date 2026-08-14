@@ -10,12 +10,20 @@ import type {
   CreateRunInput,
   CreateSessionInput,
   StartAgentInput,
+  TerminalAttachInput,
+  TerminalResizeInput,
   UpdateSessionInput,
 } from '@shared/ipc';
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
 import { startRun, cancelRun } from '../agents/runner';
+import {
+  attachTerminal,
+  writeTerminal,
+  resizeTerminal,
+  killTerminal,
+} from '../terminal/manager';
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -26,6 +34,13 @@ function broadcast(channel: string, payload: unknown): void {
 const emitter = {
   onEvent: (event: RunEvent) => broadcast(IpcEvent.RunEvent, event),
   onRunUpdated: (run: AgentRun) => broadcast(IpcEvent.RunUpdated, run),
+};
+
+const terminalEmitter = {
+  onData: (runId: string, data: string) =>
+    broadcast(IpcEvent.TerminalData, { runId, data }),
+  onExit: (runId: string, exitCode: number) =>
+    broadcast(IpcEvent.TerminalExit, { runId, exitCode }),
 };
 
 export function registerIpc(): void {
@@ -57,6 +72,20 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IpcChannel.AgentCancel, (_e, runId: string) => {
     cancelRun(runId);
+  });
+
+  // Terminal runs (PTY transport).
+  ipcMain.handle(IpcChannel.TerminalAttach, (_e, input: TerminalAttachInput) => {
+    attachTerminal(input.runId, input.cwd, input.cols, input.rows, terminalEmitter);
+  });
+  ipcMain.on(IpcChannel.TerminalInput, (_e, runId: string, data: string) => {
+    writeTerminal(runId, data);
+  });
+  ipcMain.on(IpcChannel.TerminalResize, (_e, input: TerminalResizeInput) => {
+    resizeTerminal(input.runId, input.cols, input.rows);
+  });
+  ipcMain.on(IpcChannel.TerminalKill, (_e, runId: string) => {
+    killTerminal(runId);
   });
 
   // Native folder picker for choosing a run's working directory.

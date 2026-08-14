@@ -5,7 +5,13 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import { IpcChannel, IpcEvent, type WhetstoneApi } from '@shared/ipc';
+import {
+  IpcChannel,
+  IpcEvent,
+  type WhetstoneApi,
+  type TerminalDataPayload,
+  type TerminalExitPayload,
+} from '@shared/ipc';
 import type { AgentRun, RunEvent } from '@shared/models';
 
 const api: WhetstoneApi = {
@@ -28,6 +34,12 @@ const api: WhetstoneApi = {
   dialog: {
     pickDirectory: () => ipcRenderer.invoke(IpcChannel.DialogPickDirectory),
   },
+  terminal: {
+    attach: (input) => ipcRenderer.invoke(IpcChannel.TerminalAttach, input),
+    input: (runId, data) => ipcRenderer.send(IpcChannel.TerminalInput, runId, data),
+    resize: (input) => ipcRenderer.send(IpcChannel.TerminalResize, input),
+    kill: (runId) => ipcRenderer.send(IpcChannel.TerminalKill, runId),
+  },
   onRunEvent: (listener) => {
     const handler = (_e: unknown, event: RunEvent) => listener(event);
     ipcRenderer.on(IpcEvent.RunEvent, handler);
@@ -37,6 +49,16 @@ const api: WhetstoneApi = {
     const handler = (_e: unknown, run: AgentRun) => listener(run);
     ipcRenderer.on(IpcEvent.RunUpdated, handler);
     return () => ipcRenderer.removeListener(IpcEvent.RunUpdated, handler);
+  },
+  onTerminalData: (listener) => {
+    const handler = (_e: unknown, payload: TerminalDataPayload) => listener(payload);
+    ipcRenderer.on(IpcEvent.TerminalData, handler);
+    return () => ipcRenderer.removeListener(IpcEvent.TerminalData, handler);
+  },
+  onTerminalExit: (listener) => {
+    const handler = (_e: unknown, payload: TerminalExitPayload) => listener(payload);
+    ipcRenderer.on(IpcEvent.TerminalExit, handler);
+    return () => ipcRenderer.removeListener(IpcEvent.TerminalExit, handler);
   },
 };
 

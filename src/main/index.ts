@@ -7,6 +7,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
 import { initDb, closeDb } from './db/client';
 import { registerIpc } from './ipc';
+import { killAllTerminals } from './terminal/manager';
 
 const isDev = !app.isPackaged;
 
@@ -59,4 +60,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('will-quit', () => closeDb());
+app.on('will-quit', () => {
+  killAllTerminals();
+  closeDb();
+});

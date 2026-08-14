@@ -15,6 +15,13 @@ export type RunStatus = 'idle' | 'running' | 'completed' | 'error' | 'canceled';
 /** How a run entered whetstone. `launched` = we drove it via an SDK/CLI. */
 export type RunOrigin = 'launched' | 'imported';
 
+/**
+ * How a run is driven — the experiment axis:
+ *  - `sdk`      structured drive via the Claude Agent SDK (normalized events)
+ *  - `terminal` a live PTY running the `claude` CLI, streamed to an xterm view
+ */
+export type RunMode = 'sdk' | 'terminal';
+
 /** Identifier of the agent backend that produced a run. */
 export type ProviderId = 'claude-code';
 
@@ -32,6 +39,7 @@ export interface AgentRun {
   id: string;
   sessionId: string;
   provider: ProviderId;
+  mode: RunMode;
   /** The provider's own session id (e.g. Claude Agent SDK session_id). */
   externalId: string | null;
   origin: RunOrigin;
