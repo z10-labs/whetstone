@@ -1,15 +1,26 @@
 import { useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import type { AgentRun, RunEvent } from '@shared/models';
+import type { AgentRun, AskEventData, RunEvent } from '@shared/models';
 import { prettyPath, statusColorVar, statusLabel } from '../lib/ui';
+import { QuestionCard } from './QuestionCard';
 
 interface Props {
   run: AgentRun | null;
   events: RunEvent[];
+  onAnswer: (questionId: string, answer: string) => void;
 }
 
-export function Transcript({ run, events }: Props) {
+export function Transcript({ run, events, onAnswer }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Pair each answer to its question so answered cards render resolved.
+  const answersByQuestion = new Map<string, string>();
+  for (const ev of events) {
+    if (ev.kind === 'answer') {
+      const qid = (ev.data as { questionId?: string } | null)?.questionId;
+      if (qid) answersByQuestion.set(qid, ev.text ?? '');
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -47,9 +58,22 @@ export function Transcript({ run, events }: Props) {
             <p>This run is idle. Send a prompt below to start it.</p>
           </div>
         )}
-        {events.map((ev) => (
-          <EventView key={ev.id} event={ev} />
-        ))}
+        {events.map((ev) => {
+          // Answers are folded into their question card.
+          if (ev.kind === 'answer') return null;
+          if (ev.kind === 'ask') {
+            const data = ev.data as AskEventData;
+            return (
+              <QuestionCard
+                key={ev.id}
+                data={data}
+                answer={answersByQuestion.get(data.questionId)}
+                onAnswer={onAnswer}
+              />
+            );
+          }
+          return <EventView key={ev.id} event={ev} />;
+        })}
         <div ref={bottomRef} />
       </div>
     </>

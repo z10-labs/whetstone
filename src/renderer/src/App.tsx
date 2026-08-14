@@ -30,7 +30,7 @@ export default function App() {
           <TerminalView key={run.id} run={run} />
         ) : (
           <>
-            <Transcript run={run} events={store.events} />
+            <Transcript run={run} events={store.events} onAnswer={store.answerQuestion} />
             <PromptBar run={run} onSend={store.startAgent} onCancel={store.cancelAgent} />
           </>
         )}

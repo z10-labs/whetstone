@@ -7,6 +7,7 @@
 import { ipcMain, BrowserWindow, dialog } from 'electron';
 import { IpcChannel, IpcEvent } from '@shared/ipc';
 import type {
+  AnswerAgentInput,
   CreateRunInput,
   CreateSessionInput,
   StartAgentInput,
@@ -17,7 +18,7 @@ import type {
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
-import { startRun, cancelRun } from '../agents/runner';
+import { startRun, cancelRun, submitAnswer } from '../agents/runner';
 import {
   attachTerminal,
   writeTerminal,
@@ -73,6 +74,9 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.AgentCancel, (_e, runId: string) => {
     cancelRun(runId);
   });
+  ipcMain.handle(IpcChannel.AgentAnswer, (_e, input: AnswerAgentInput) =>
+    submitAnswer(input.questionId, input.answer),
+  );
 
   // Terminal runs (PTY transport).
   ipcMain.handle(IpcChannel.TerminalAttach, (_e, input: TerminalAttachInput) => {

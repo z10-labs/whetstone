@@ -30,6 +30,7 @@ const api: WhetstoneApi = {
   agent: {
     start: (input) => ipcRenderer.invoke(IpcChannel.AgentStart, input),
     cancel: (runId) => ipcRenderer.invoke(IpcChannel.AgentCancel, runId),
+    answer: (input) => ipcRenderer.invoke(IpcChannel.AgentAnswer, input),
   },
   dialog: {
     pickDirectory: () => ipcRenderer.invoke(IpcChannel.DialogPickDirectory),

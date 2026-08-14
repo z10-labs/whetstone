@@ -32,7 +32,7 @@ export function PromptBar({ run, onSend, onCancel }: Props) {
             running
               ? 'Agent is working…'
               : isFirst
-                ? 'Give the agent its first instruction… (plan mode — read-only)'
+                ? 'Give the agent its first instruction… (full access in this directory)'
                 : 'Continue this run…'
           }
           onChange={(e) => {

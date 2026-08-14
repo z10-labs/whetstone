@@ -18,6 +18,7 @@ export const IpcChannel = {
   RunsMove: 'runs:move',
   AgentStart: 'agent:start',
   AgentCancel: 'agent:cancel',
+  AgentAnswer: 'agent:answer',
   DialogPickDirectory: 'dialog:pick-directory',
   TerminalAttach: 'terminal:attach',
   TerminalInput: 'terminal:input',
@@ -87,6 +88,11 @@ export interface StartAgentInput {
   prompt: string;
 }
 
+export interface AnswerAgentInput {
+  questionId: string;
+  answer: string;
+}
+
 /**
  * The API shape exposed to the renderer via `window.whetstone`.
  * Every method is async and crosses the process boundary.
@@ -107,6 +113,8 @@ export interface WhetstoneApi {
   agent: {
     start(input: StartAgentInput): Promise<void>;
     cancel(runId: string): Promise<void>;
+    /** Answer a pending ask_user question, unblocking the run. */
+    answer(input: AnswerAgentInput): Promise<void>;
   };
   dialog: {
     /** Native folder picker. Returns the chosen absolute path, or null. */

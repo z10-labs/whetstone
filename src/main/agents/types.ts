@@ -5,7 +5,10 @@
  * and, later, "observe" (discover) hang off this one interface.
  */
 
-import type { ProviderId, RunEventKind } from '@shared/models';
+import type { AskUserRequest, ProviderId, RunEventKind } from '@shared/models';
+
+/** Interactive callback a run can use to ask the human a question and wait. */
+export type AskUserFn = (request: AskUserRequest) => Promise<string>;
 
 /** SDK permission postures. v1 drives everything in 'plan' (no execution). */
 export type PermissionMode =
@@ -39,6 +42,8 @@ export interface LaunchParams {
   permissionMode: PermissionMode;
   /** The runner owns this so it can cancel the run. */
   abortController: AbortController;
+  /** If provided, expose an `ask_user` tool that routes through this. */
+  askUser?: AskUserFn;
 }
 
 export interface AgentProvider {

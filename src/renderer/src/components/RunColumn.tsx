@@ -45,7 +45,7 @@ export function RunColumn({ session, selectedRunId, onSelectRun, onNewRun }: Pro
             <div className="menu" role="menu">
               <button className="menu-item" onClick={() => choose('sdk')}>
                 <span className="menu-title">Structured run</span>
-                <span className="menu-sub">SDK · streamed events · read-only</span>
+                <span className="menu-sub">SDK · streamed events · can ask you</span>
               </button>
               <button className="menu-item" onClick={() => choose('terminal')}>
                 <span className="menu-title">Terminal run</span>

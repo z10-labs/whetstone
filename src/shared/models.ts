@@ -63,7 +63,29 @@ export type RunEventKind =
   | 'tool_result'
   | 'system'
   | 'result'
-  | 'error';
+  | 'error'
+  | 'ask'
+  | 'answer';
+
+/** One selectable option for an `ask_user` question. */
+export interface AskOption {
+  label: string;
+  description?: string;
+  /** Optional richer preview text (mirrors the SDK's AskUserQuestion preview). */
+  preview?: string;
+}
+
+/** Payload the agent sends when it asks the human a clarifying question. */
+export interface AskUserRequest {
+  question: string;
+  options?: AskOption[];
+  multiSelect?: boolean;
+}
+
+/** The `data` shape stored on an `ask` RunEvent. */
+export interface AskEventData extends AskUserRequest {
+  questionId: string;
+}
 
 export interface RunEvent {
   id: string;

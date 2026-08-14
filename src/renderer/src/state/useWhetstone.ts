@@ -81,6 +81,10 @@ export function useWhetstone() {
     if (runId) await api.agent.cancel(runId);
   }, []);
 
+  const answerQuestion = useCallback(async (questionId: string, answer: string) => {
+    await api.agent.answer({ questionId, answer });
+  }, []);
+
   const moveRun = useCallback(
     async (runId: string, toSessionId: string) => {
       await api.runs.move(runId, toSessionId);
@@ -132,6 +136,7 @@ export function useWhetstone() {
     createRun,
     startAgent,
     cancelAgent,
+    answerQuestion,
     moveRun,
   };
 }

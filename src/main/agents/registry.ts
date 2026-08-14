@@ -11,8 +11,13 @@ import { claudeCodeProvider } from './claude-code';
 /** Default model for launched runs. Overridable per-run later. */
 export const DEFAULT_MODEL = 'claude-sonnet-5';
 
-/** v1 drives everything read-only: plan mode performs no tool execution. */
-export const DEFAULT_PERMISSION_MODE = 'plan' as const;
+/**
+ * Runs drive with full permissions: the agent may edit files and run commands
+ * in the run's working directory without prompting. `bypassPermissions` also
+ * auto-approves the in-process `ask_user` tool. A per-tool approval UI will
+ * replace this blanket grant later.
+ */
+export const DEFAULT_PERMISSION_MODE = 'bypassPermissions' as const;
 
 const providers: Record<ProviderId, AgentProvider> = {
   'claude-code': claudeCodeProvider,
