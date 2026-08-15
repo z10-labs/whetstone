@@ -124,13 +124,24 @@ function EventView({ event }: { event: RunEvent }) {
           </div>
         </div>
       );
-    case 'result':
+    case 'result': {
+      // The SDK's result text duplicates the final assistant message, so we
+      // render a compact completion footer with the useful metadata instead.
+      const d =
+        (event.data as { isError?: boolean; numTurns?: number; totalCostUsd?: number } | null) ??
+        {};
+      const cost = typeof d.totalCostUsd === 'number' ? `$${d.totalCostUsd.toFixed(4)}` : null;
       return (
-        <div className="event event--result">
-          <div className="who">Result</div>
-          <div className="bubble">{event.text || 'Run finished.'}</div>
+        <div className={`result-chip${d.isError ? ' is-error' : ''}`}>
+          <span className="result-mark">{d.isError ? '✕' : '✓'}</span>
+          <span>{d.isError ? 'Ended with error' : 'Completed'}</span>
+          {typeof d.numTurns === 'number' && (
+            <span className="result-meta">{d.numTurns} turns</span>
+          )}
+          {cost && <span className="result-meta">{cost}</span>}
         </div>
       );
+    }
     case 'error':
       return (
         <div className="event event--error">

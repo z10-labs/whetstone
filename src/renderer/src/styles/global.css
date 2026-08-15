@@ -360,8 +360,38 @@ button {
   color: var(--text-dim);
   overflow-x: auto;
 }
-.event--result .bubble {
-  border-color: color-mix(in oklab, var(--ok) 35%, var(--line));
+.result-chip {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 6px 14px;
+  margin: var(--sp-2) 0;
+  border-radius: 100px;
+  border: 1px solid color-mix(in oklab, var(--ok) 30%, var(--line));
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  animation: rise var(--dur) var(--ease);
+}
+.result-chip.is-error {
+  border-color: color-mix(in oklab, var(--err) 40%, var(--line));
+}
+.result-mark {
+  color: var(--ok);
+  font-weight: 700;
+}
+.result-chip.is-error .result-mark {
+  color: var(--err);
+}
+.result-meta {
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+}
+.result-meta::before {
+  content: '·';
+  margin-right: var(--sp-3);
+  color: var(--line-strong);
 }
 .event--error .bubble {
   border-color: color-mix(in oklab, var(--err) 45%, var(--line));
