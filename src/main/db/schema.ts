@@ -54,9 +54,14 @@ export const runEvents = sqliteTable(
     text: text('text'),
     toolName: text('tool_name'),
     data: text('data'),
+    /** Source line uuid for jsonl-mirrored events — used to dedup on re-tail. */
+    sourceUuid: text('source_uuid'),
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [index('run_events_run_seq_idx').on(t.runId, t.seq)],
+  (t) => [
+    index('run_events_run_seq_idx').on(t.runId, t.seq),
+    index('run_events_source_uuid_idx').on(t.runId, t.sourceUuid),
+  ],
 );
 
 export type SessionRow = typeof sessions.$inferSelect;

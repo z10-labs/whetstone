@@ -48,14 +48,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS agent_runs_provider_external_idx
   ON agent_runs(provider, external_id);
 
 CREATE TABLE IF NOT EXISTS run_events (
-  id         TEXT PRIMARY KEY,
-  run_id     TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
-  seq        INTEGER NOT NULL,
-  kind       TEXT NOT NULL,
-  text       TEXT,
-  tool_name  TEXT,
-  data       TEXT,
-  created_at INTEGER NOT NULL
+  id          TEXT PRIMARY KEY,
+  run_id      TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+  seq         INTEGER NOT NULL,
+  kind        TEXT NOT NULL,
+  text        TEXT,
+  tool_name   TEXT,
+  data        TEXT,
+  source_uuid TEXT,
+  created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS run_events_run_seq_idx ON run_events(run_id, seq);
 `;
@@ -66,11 +67,21 @@ CREATE INDEX IF NOT EXISTS run_events_run_seq_idx ON run_events(run_id, seq);
  * columns are added here.
  */
 async function ensureColumns(client: Client): Promise<void> {
-  const info = await client.execute('PRAGMA table_info(agent_runs)');
-  const columns = new Set(info.rows.map((r) => String(r.name)));
-  if (!columns.has('mode')) {
+  const runs = await client.execute('PRAGMA table_info(agent_runs)');
+  const runCols = new Set(runs.rows.map((r) => String(r.name)));
+  if (!runCols.has('mode')) {
     await client.execute("ALTER TABLE agent_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'sdk'");
   }
+
+  const events = await client.execute('PRAGMA table_info(run_events)');
+  const eventCols = new Set(events.rows.map((r) => String(r.name)));
+  if (!eventCols.has('source_uuid')) {
+    await client.execute('ALTER TABLE run_events ADD COLUMN source_uuid TEXT');
+  }
+  // Created here (not in bootstrap) so the column is guaranteed to exist first.
+  await client.execute(
+    'CREATE INDEX IF NOT EXISTS run_events_source_uuid_idx ON run_events(run_id, source_uuid)',
+  );
 }
 
 export type Db = LibSQLDatabase<typeof schema>;

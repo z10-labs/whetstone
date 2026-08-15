@@ -25,6 +25,7 @@ import {
   resizeTerminal,
   killTerminal,
 } from '../terminal/manager';
+import { startTail, stopTail } from '../terminal/tail';
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -40,13 +41,17 @@ const emitter = {
 const terminalEmitter = {
   onData: (runId: string, data: string) =>
     broadcast(IpcEvent.TerminalData, { runId, data }),
-  onExit: (runId: string, exitCode: number) =>
-    broadcast(IpcEvent.TerminalExit, { runId, exitCode }),
+  onExit: (runId: string, exitCode: number) => {
+    stopTail(runId);
+    broadcast(IpcEvent.TerminalExit, { runId, exitCode });
+  },
   onSession: (runId: string, sessionId: string) => {
     void runsRepo
       .setRunExternalId(runId, sessionId)
       .then((run) => broadcast(IpcEvent.RunUpdated, run))
       .catch((err) => console.error('[whetstone] setRunExternalId failed:', err));
+    // Begin mirroring this session's transcript into structured events.
+    void startTail(runId, sessionId, emitter);
   },
 };
 
@@ -94,6 +99,8 @@ export function registerIpc(): void {
       input.resume ?? null,
       terminalEmitter,
     );
+    // Resumed runs already have their session id — start mirroring immediately.
+    if (input.resume) void startTail(input.runId, input.resume, emitter);
   });
   ipcMain.on(IpcChannel.TerminalInput, (_e, runId: string, data: string) => {
     writeTerminal(runId, data);

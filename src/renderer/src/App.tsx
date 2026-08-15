@@ -2,7 +2,7 @@ import { useWhetstone } from './state/useWhetstone';
 import { SessionSidebar } from './components/SessionSidebar';
 import { RunColumn } from './components/RunColumn';
 import { Transcript } from './components/Transcript';
-import { TerminalView } from './components/TerminalView';
+import { TerminalRunView } from './components/TerminalRunView';
 import { PromptBar } from './components/PromptBar';
 
 export default function App() {
@@ -27,7 +27,12 @@ export default function App() {
 
       <main className="col col--transcript">
         {run?.mode === 'terminal' ? (
-          <TerminalView key={run.id} run={run} />
+          <TerminalRunView
+            key={run.id}
+            run={run}
+            events={store.events}
+            onAnswer={store.answerQuestion}
+          />
         ) : (
           <>
             <Transcript run={run} events={store.events} onAnswer={store.answerQuestion} />

@@ -138,6 +138,8 @@ interface AppendEventInput {
   text?: string | null;
   toolName?: string | null;
   data?: unknown;
+  /** Source jsonl line uuid, for mirrored terminal events (dedup on re-tail). */
+  sourceUuid?: string | null;
 }
 
 export async function appendEvent(runId: string, input: AppendEventInput): Promise<RunEvent> {
@@ -157,6 +159,7 @@ export async function appendEvent(runId: string, input: AppendEventInput): Promi
     text: input.text ?? null,
     toolName: input.toolName ?? null,
     data: input.data === undefined || input.data === null ? null : JSON.stringify(input.data),
+    sourceUuid: input.sourceUuid ?? null,
     createdAt: Date.now(),
   };
   await db.insert(runEvents).values(row).run();
@@ -180,6 +183,18 @@ export async function listEvents(runId: string): Promise<RunEvent[]> {
     .orderBy(asc(runEvents.seq))
     .all();
   return rows.map(toEvent);
+}
+
+/** Source uuids already mirrored for a run, so re-tailing never double-inserts. */
+export async function listEventSourceUuids(runId: string): Promise<Set<string>> {
+  const rows = await getDb()
+    .select({ sourceUuid: runEvents.sourceUuid })
+    .from(runEvents)
+    .where(eq(runEvents.runId, runId))
+    .all();
+  const set = new Set<string>();
+  for (const row of rows) if (row.sourceUuid) set.add(row.sourceUuid);
+  return set;
 }
 
 /** Guard used by the agent runner: is there already a run for this external id? */

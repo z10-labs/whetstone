@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { initDb, closeDb } from './db/client';
 import { registerIpc } from './ipc';
 import { killAllTerminals } from './terminal/manager';
+import { stopAllTails } from './terminal/tail';
 
 const isDev = !app.isPackaged;
 
@@ -61,6 +62,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stopAllTails();
   killAllTerminals();
   closeDb();
 });
