@@ -115,6 +115,11 @@ export function setRunExternal(id: string, externalId: string, model: string | n
   return patchRun(id, { externalId, model });
 }
 
+/** Record only the native session id (terminal runs capture this separately). */
+export function setRunExternalId(id: string, externalId: string): Promise<AgentRun> {
+  return patchRun(id, { externalId });
+}
+
 export function setRunTitle(id: string, title: string): Promise<AgentRun> {
   return patchRun(id, { title: title.trim() || 'New run' });
 }

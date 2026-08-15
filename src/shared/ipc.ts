@@ -63,6 +63,8 @@ export interface TerminalAttachInput {
   cwd: string;
   cols: number;
   rows: number;
+  /** Claude Code session id to resume, if this run has one. */
+  resume?: string | null;
 }
 
 export interface TerminalResizeInput {

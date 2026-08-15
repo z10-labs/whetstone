@@ -62,8 +62,15 @@ export function TerminalView({ run }: { run: AgentRun }) {
       }
     });
 
-    // Spawn (or re-attach and replay) the PTY.
-    void api.terminal.attach({ runId, cwd: run.cwd, cols: term.cols, rows: term.rows });
+    // Spawn (or re-attach and replay) the PTY. A known externalId means we
+    // resume that Claude Code session rather than starting a fresh one.
+    void api.terminal.attach({
+      runId,
+      cwd: run.cwd,
+      cols: term.cols,
+      rows: term.rows,
+      resume: run.externalId,
+    });
 
     const resize = new ResizeObserver(() => {
       try {
@@ -93,6 +100,7 @@ export function TerminalView({ run }: { run: AgentRun }) {
         <div className="subline">
           <span className="badge badge--mode">terminal · claude</span>
           <span className="path">{prettyPath(run.cwd)}</span>
+          {run.externalId && <span className="path">· {run.externalId.slice(0, 8)}</span>}
         </div>
       </header>
       <div className="terminal-wrap">

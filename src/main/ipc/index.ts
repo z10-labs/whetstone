@@ -42,6 +42,12 @@ const terminalEmitter = {
     broadcast(IpcEvent.TerminalData, { runId, data }),
   onExit: (runId: string, exitCode: number) =>
     broadcast(IpcEvent.TerminalExit, { runId, exitCode }),
+  onSession: (runId: string, sessionId: string) => {
+    void runsRepo
+      .setRunExternalId(runId, sessionId)
+      .then((run) => broadcast(IpcEvent.RunUpdated, run))
+      .catch((err) => console.error('[whetstone] setRunExternalId failed:', err));
+  },
 };
 
 export function registerIpc(): void {
@@ -80,7 +86,14 @@ export function registerIpc(): void {
 
   // Terminal runs (PTY transport).
   ipcMain.handle(IpcChannel.TerminalAttach, (_e, input: TerminalAttachInput) => {
-    attachTerminal(input.runId, input.cwd, input.cols, input.rows, terminalEmitter);
+    attachTerminal(
+      input.runId,
+      input.cwd,
+      input.cols,
+      input.rows,
+      input.resume ?? null,
+      terminalEmitter,
+    );
   });
   ipcMain.on(IpcChannel.TerminalInput, (_e, runId: string, data: string) => {
     writeTerminal(runId, data);
