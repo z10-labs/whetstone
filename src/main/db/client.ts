@@ -59,6 +59,67 @@ CREATE TABLE IF NOT EXISTS run_events (
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS run_events_run_seq_idx ON run_events(run_id, seq);
+
+CREATE TABLE IF NOT EXISTS spec_reviews (
+  id           TEXT PRIMARY KEY,
+  cwd          TEXT NOT NULL,
+  pr_number    INTEGER NOT NULL,
+  pr_url       TEXT,
+  title        TEXT NOT NULL,
+  author       TEXT,
+  base         TEXT,
+  head         TEXT,
+  state        TEXT,
+  commit_count INTEGER NOT NULL DEFAULT 0,
+  intent       TEXT,
+  status       TEXT NOT NULL DEFAULT 'fetching',
+  error        TEXT,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS spec_reviews_updated_idx ON spec_reviews(updated_at);
+
+CREATE TABLE IF NOT EXISTS spec_goals (
+  id        TEXT PRIMARY KEY,
+  review_id TEXT NOT NULL REFERENCES spec_reviews(id) ON DELETE CASCADE,
+  key       TEXT NOT NULL,
+  label     TEXT NOT NULL,
+  blurb     TEXT NOT NULL DEFAULT '',
+  color     TEXT NOT NULL DEFAULT 'slate',
+  sort      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS spec_goals_review_idx ON spec_goals(review_id);
+
+CREATE TABLE IF NOT EXISTS spec_files (
+  id              TEXT PRIMARY KEY,
+  review_id       TEXT NOT NULL REFERENCES spec_reviews(id) ON DELETE CASCADE,
+  path            TEXT NOT NULL,
+  additions       INTEGER NOT NULL DEFAULT 0,
+  deletions       INTEGER NOT NULL DEFAULT 0,
+  change_type     TEXT NOT NULL DEFAULT 'modified',
+  spec            TEXT,
+  connects        TEXT,
+  behavior_change TEXT,
+  is_test         INTEGER NOT NULL DEFAULT 0,
+  reviewed        INTEGER NOT NULL DEFAULT 0,
+  hunk            TEXT,
+  patch           TEXT
+);
+CREATE INDEX IF NOT EXISTS spec_files_review_idx ON spec_files(review_id);
+
+CREATE TABLE IF NOT EXISTS spec_file_goals (
+  file_id TEXT NOT NULL REFERENCES spec_files(id) ON DELETE CASCADE,
+  goal_id TEXT NOT NULL REFERENCES spec_goals(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS spec_file_goals_file_idx ON spec_file_goals(file_id);
+
+CREATE TABLE IF NOT EXISTS spec_file_deps (
+  id      TEXT PRIMARY KEY,
+  file_id TEXT NOT NULL REFERENCES spec_files(id) ON DELETE CASCADE,
+  path    TEXT NOT NULL,
+  note    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS spec_file_deps_file_idx ON spec_file_deps(file_id);
 `;
 
 /**

@@ -10,15 +10,19 @@ import type {
   AnswerAgentInput,
   CreateRunInput,
   CreateSessionInput,
+  SetReviewedInput,
   StartAgentInput,
+  StartExplainPrInput,
   TerminalAttachInput,
   TerminalResizeInput,
   UpdateSessionInput,
 } from '@shared/ipc';
+import type { SpecReviewDetail } from '@shared/explain-pr';
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
 import { startRun, cancelRun, submitAnswer } from '../agents/runner';
+import * as explainPr from '../explain-pr/service';
 import {
   attachTerminal,
   writeTerminal,
@@ -112,11 +116,26 @@ export function registerIpc(): void {
     killTerminal(runId);
   });
 
+  const explainEmit = (detail: SpecReviewDetail) => broadcast(IpcEvent.ExplainPrUpdated, detail);
+
+  ipcMain.handle(IpcChannel.ExplainPrList, () => explainPr.listReviews());
+  ipcMain.handle(IpcChannel.ExplainPrListOpen, (_e, cwd: string) => explainPr.listOpen(cwd));
+  ipcMain.handle(IpcChannel.ExplainPrStart, (_e, input: StartExplainPrInput) =>
+    explainPr.startReview(input, explainEmit),
+  );
+  ipcMain.handle(IpcChannel.ExplainPrGet, (_e, id: string) => explainPr.getReview(id));
+  ipcMain.handle(IpcChannel.ExplainPrSetReviewed, (_e, input: SetReviewedInput) =>
+    explainPr.setReviewed(input.reviewId, input.path, input.reviewed, explainEmit),
+  );
+  ipcMain.handle(IpcChannel.ExplainPrCancel, (_e, id: string) => {
+    explainPr.cancelReview(id);
+  });
+
   // Native folder picker for choosing a run's working directory.
   ipcMain.handle(IpcChannel.DialogPickDirectory, async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
-      title: 'Choose a working directory for this run',
+      title: 'Choose a folder',
     });
     return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
   });

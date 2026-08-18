@@ -45,12 +45,16 @@ button {
   background-clip: padding-box;
 }
 
-/* ---- App shell: three columns ---- */
+/* ---- App shell: icon rail + three columns ---- */
 .app {
   display: grid;
-  grid-template-columns: 264px 340px 1fr;
+  grid-template-columns: 52px 264px 340px 1fr;
+  grid-template-rows: 38px 1fr;
   height: 100%;
   background: var(--bg-app);
+}
+.app.is-tool {
+  grid-template-columns: 52px 1fr;
 }
 
 .col {
@@ -61,25 +65,35 @@ button {
   overflow: hidden;
 }
 .col--sessions {
+  grid-column: 2;
+  grid-row: 2;
   background: var(--bg-panel);
   border-right: 1px solid var(--line);
 }
 .col--runs {
+  grid-column: 3;
+  grid-row: 2;
   background: var(--bg-panel-2);
   border-right: 1px solid var(--line);
 }
 .col--transcript {
+  grid-column: 4;
+  grid-row: 2;
   background: var(--bg-inset);
 }
 
 /* Draggable title strip (macOS hidden-inset chrome) */
 .titlestrip {
+  grid-column: 1 / -1;
+  grid-row: 1;
   height: 38px;
   flex: 0 0 auto;
   -webkit-app-region: drag;
   display: flex;
   align-items: center;
   padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-panel);
 }
 .titlestrip .brand {
   font-family: var(--font-mono);

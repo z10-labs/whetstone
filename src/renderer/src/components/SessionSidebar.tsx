@@ -22,11 +22,6 @@ export function SessionSidebar({ sessions, selectedId, onSelect, onCreate }: Pro
 
   return (
     <nav className="col col--sessions" aria-label="Sessions">
-      <div className="titlestrip">
-        <span className="brand">
-          Whet<b>stone</b>
-        </span>
-      </div>
       <div className="col-head">
         <h2>Sessions</h2>
         <button className="icon-btn" onClick={() => setCreating((v) => !v)} title="New session">

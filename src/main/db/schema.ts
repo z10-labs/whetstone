@@ -64,6 +64,97 @@ export const runEvents = sqliteTable(
   ],
 );
 
+export const specReviews = sqliteTable(
+  'spec_reviews',
+  {
+    id: text('id').primaryKey(),
+    cwd: text('cwd').notNull(),
+    prNumber: integer('pr_number').notNull(),
+    prUrl: text('pr_url'),
+    title: text('title').notNull(),
+    author: text('author'),
+    base: text('base'),
+    head: text('head'),
+    state: text('state'),
+    commitCount: integer('commit_count').notNull().default(0),
+    intent: text('intent'),
+    status: text('status').notNull().default('fetching'),
+    error: text('error'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('spec_reviews_updated_idx').on(t.updatedAt)],
+);
+
+export const specGoals = sqliteTable(
+  'spec_goals',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => specReviews.id, { onDelete: 'cascade' }),
+    key: text('key').notNull(),
+    label: text('label').notNull(),
+    blurb: text('blurb').notNull().default(''),
+    color: text('color').notNull().default('slate'),
+    sort: integer('sort').notNull().default(0),
+  },
+  (t) => [index('spec_goals_review_idx').on(t.reviewId)],
+);
+
+export const specFiles = sqliteTable(
+  'spec_files',
+  {
+    id: text('id').primaryKey(),
+    reviewId: text('review_id')
+      .notNull()
+      .references(() => specReviews.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    additions: integer('additions').notNull().default(0),
+    deletions: integer('deletions').notNull().default(0),
+    changeType: text('change_type').notNull().default('modified'),
+    spec: text('spec'),
+    connects: text('connects'),
+    behaviorChange: text('behavior_change'),
+    isTest: integer('is_test').notNull().default(0),
+    reviewed: integer('reviewed').notNull().default(0),
+    hunk: text('hunk'),
+    patch: text('patch'),
+  },
+  (t) => [index('spec_files_review_idx').on(t.reviewId)],
+);
+
+export const specFileGoals = sqliteTable(
+  'spec_file_goals',
+  {
+    fileId: text('file_id')
+      .notNull()
+      .references(() => specFiles.id, { onDelete: 'cascade' }),
+    goalId: text('goal_id')
+      .notNull()
+      .references(() => specGoals.id, { onDelete: 'cascade' }),
+  },
+  (t) => [index('spec_file_goals_file_idx').on(t.fileId)],
+);
+
+export const specFileDeps = sqliteTable(
+  'spec_file_deps',
+  {
+    id: text('id').primaryKey(),
+    fileId: text('file_id')
+      .notNull()
+      .references(() => specFiles.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    note: text('note').notNull().default(''),
+  },
+  (t) => [index('spec_file_deps_file_idx').on(t.fileId)],
+);
+
 export type SessionRow = typeof sessions.$inferSelect;
 export type AgentRunRow = typeof agentRuns.$inferSelect;
 export type RunEventRow = typeof runEvents.$inferSelect;
+export type SpecReviewRow = typeof specReviews.$inferSelect;
+export type SpecGoalRow = typeof specGoals.$inferSelect;
+export type SpecFileRow = typeof specFiles.$inferSelect;
+export type SpecFileGoalRow = typeof specFileGoals.$inferSelect;
+export type SpecFileDepRow = typeof specFileDeps.$inferSelect;

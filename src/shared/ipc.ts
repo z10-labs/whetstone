@@ -4,6 +4,12 @@
  * one shared file means the renderer and main can never drift apart.
  */
 
+import type {
+  GhPrListItem,
+  SpecReview,
+  SpecReviewDetail,
+  SpecReviewListItem,
+} from './explain-pr';
 import type { AgentRun, RunEvent, RunMode, Session, SessionWithRuns } from './models';
 
 /** Channel names for request/response (ipcRenderer.invoke) calls. */
@@ -24,6 +30,12 @@ export const IpcChannel = {
   TerminalInput: 'terminal:input',
   TerminalResize: 'terminal:resize',
   TerminalKill: 'terminal:kill',
+  ExplainPrList: 'explain-pr:list',
+  ExplainPrListOpen: 'explain-pr:list-open',
+  ExplainPrStart: 'explain-pr:start',
+  ExplainPrGet: 'explain-pr:get',
+  ExplainPrSetReviewed: 'explain-pr:set-reviewed',
+  ExplainPrCancel: 'explain-pr:cancel',
 } as const;
 
 /** Channel names for main → renderer streaming (webContents.send). */
@@ -36,6 +48,8 @@ export const IpcEvent = {
   TerminalData: 'stream:terminal-data',
   /** A terminal run's PTY exited: { runId, exitCode }. */
   TerminalExit: 'stream:terminal-exit',
+  /** Spec review changed (fetch progress, a new emit, reviewed toggle). */
+  ExplainPrUpdated: 'stream:explain-pr-updated',
 } as const;
 
 export interface CreateSessionInput {
@@ -95,6 +109,18 @@ export interface AnswerAgentInput {
   answer: string;
 }
 
+export interface StartExplainPrInput {
+  cwd: string;
+  /** PR number (`178`), `#178`, or a GitHub pull URL. */
+  pr: string;
+}
+
+export interface SetReviewedInput {
+  reviewId: string;
+  path: string;
+  reviewed: boolean;
+}
+
 /**
  * The API shape exposed to the renderer via `window.whetstone`.
  * Every method is async and crosses the process boundary.
@@ -132,6 +158,15 @@ export interface WhetstoneApi {
     /** Terminate the PTY. */
     kill(runId: string): void;
   };
+  explainPr: {
+    list(): Promise<SpecReviewListItem[]>;
+    /** Open PRs in a local checkout, via `gh pr list`. */
+    listOpen(cwd: string): Promise<GhPrListItem[]>;
+    start(input: StartExplainPrInput): Promise<SpecReview>;
+    get(id: string): Promise<SpecReviewDetail | null>;
+    setReviewed(input: SetReviewedInput): Promise<SpecReviewDetail>;
+    cancel(id: string): Promise<void>;
+  };
   /** Subscribe to live run events. Returns an unsubscribe function. */
   onRunEvent(listener: (event: RunEvent) => void): () => void;
   /** Subscribe to run metadata updates. Returns an unsubscribe function. */
@@ -140,4 +175,6 @@ export interface WhetstoneApi {
   onTerminalData(listener: (payload: TerminalDataPayload) => void): () => void;
   /** Subscribe to PTY exit. Returns an unsubscribe function. */
   onTerminalExit(listener: (payload: TerminalExitPayload) => void): () => void;
+  /** Subscribe to spec-review updates. Returns an unsubscribe function. */
+  onExplainPrUpdated(listener: (detail: SpecReviewDetail) => void): () => void;
 }

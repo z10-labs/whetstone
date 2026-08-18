@@ -12,6 +12,7 @@ import {
   type TerminalDataPayload,
   type TerminalExitPayload,
 } from '@shared/ipc';
+import type { SpecReviewDetail } from '@shared/explain-pr';
 import type { AgentRun, RunEvent } from '@shared/models';
 
 const api: WhetstoneApi = {
@@ -41,6 +42,14 @@ const api: WhetstoneApi = {
     resize: (input) => ipcRenderer.send(IpcChannel.TerminalResize, input),
     kill: (runId) => ipcRenderer.send(IpcChannel.TerminalKill, runId),
   },
+  explainPr: {
+    list: () => ipcRenderer.invoke(IpcChannel.ExplainPrList),
+    listOpen: (cwd) => ipcRenderer.invoke(IpcChannel.ExplainPrListOpen, cwd),
+    start: (input) => ipcRenderer.invoke(IpcChannel.ExplainPrStart, input),
+    get: (id) => ipcRenderer.invoke(IpcChannel.ExplainPrGet, id),
+    setReviewed: (input) => ipcRenderer.invoke(IpcChannel.ExplainPrSetReviewed, input),
+    cancel: (id) => ipcRenderer.invoke(IpcChannel.ExplainPrCancel, id),
+  },
   onRunEvent: (listener) => {
     const handler = (_e: unknown, event: RunEvent) => listener(event);
     ipcRenderer.on(IpcEvent.RunEvent, handler);
@@ -60,6 +69,11 @@ const api: WhetstoneApi = {
     const handler = (_e: unknown, payload: TerminalExitPayload) => listener(payload);
     ipcRenderer.on(IpcEvent.TerminalExit, handler);
     return () => ipcRenderer.removeListener(IpcEvent.TerminalExit, handler);
+  },
+  onExplainPrUpdated: (listener) => {
+    const handler = (_e: unknown, detail: SpecReviewDetail) => listener(detail);
+    ipcRenderer.on(IpcEvent.ExplainPrUpdated, handler);
+    return () => ipcRenderer.removeListener(IpcEvent.ExplainPrUpdated, handler);
   },
 };
 
