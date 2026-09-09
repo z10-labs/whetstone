@@ -1,46 +1,52 @@
 /*
- * Design tokens — a dark, technical "console" direction. Disciplined contrast,
- * one warm accent (whetstone spark), a small set of status hues, generous but
- * varied rhythm. No palette values are hardcoded outside this file.
+ * Design tokens — a quiet, warm-neutral dark direction in the spirit of a
+ * calm coding surface: surfaces separated by a few percent rather than by
+ * contrast, hairlines that read as edges instead of lines, and a single
+ * muted clay accent reserved for selection, focus and identity. Status hues
+ * are desaturated so a busy run list stays legible instead of festive.
+ * No palette values are hardcoded outside this file.
  */
 
 :root {
-  /* Surfaces — layered, not flat */
-  --bg-app: #0e0f13;
-  --bg-panel: #14161c;
-  --bg-panel-2: #191c24;
-  --bg-elevated: #20242e;
-  --bg-inset: #0b0c10;
+  /* Surfaces — layered, but only just */
+  --bg-app: #191817;
+  --bg-panel: #1e1d1b;
+  --bg-panel-2: #222120;
+  --bg-elevated: #2a2826;
+  --bg-inset: #141312;
 
   /* Hairlines */
-  --line: #262a34;
-  --line-strong: #333846;
+  --line: #2b2927;
+  --line-strong: #393633;
 
   /* Text */
-  --text-hi: #eef1f7;
-  --text: #c3c8d4;
-  --text-dim: #8b92a3;
-  --text-faint: #5c6373;
+  --text-hi: #ece9e4;
+  --text: #b7b2ab;
+  --text-dim: #8f8a83;
+  --text-faint: #7a756e;
 
-  /* Accent — the "spark" struck off a whetstone */
-  --accent: #ff8a3d;
-  --accent-hi: #ffa768;
-  --accent-quiet: #ff8a3d22;
+  /* Accent — clay, the spark banked down to an ember */
+  --accent: #c96442;
+  --accent-hi: #d97757;
+  --accent-quiet: #c9644220;
+  /* Filled controls sit a shade deeper so a light label clears WCAG AA. */
+  --accent-solid: #ae5334;
+  --on-accent: #fbf7f4;
 
-  /* Status */
-  --ok: #52d18a;
-  --run: #4aa8ff;
-  --warn: #ffcf5c;
-  --err: #ff6b6b;
-  --idle: #6b7280;
+  /* Status — muted; these sit next to text, not on top of it */
+  --ok: #6ea886;
+  --run: #7a9cc6;
+  --warn: #c2a05e;
+  --err: #c96d6d;
+  --idle: #6a655f;
 
   /* Session accent swatches */
-  --c-slate: #8791a5;
-  --c-amber: #ffb454;
-  --c-violet: #b48cff;
-  --c-emerald: #58d6a2;
-  --c-rose: #ff87ab;
-  --c-cyan: #55c9e0;
+  --c-slate: #8b8781;
+  --c-amber: #c2a05e;
+  --c-violet: #a291c4;
+  --c-emerald: #6ea886;
+  --c-rose: #c08e9c;
+  --c-cyan: #7aa5b2;
 
   /* Typography */
   --font-ui:
@@ -55,6 +61,9 @@
   --text-lg: 1.35rem;
   --text-xl: 1.9rem;
 
+  /* Label tracking — small caps-ish labels stay lowercase now, so this is light */
+  --track-label: 0.02em;
+
   /* Spacing rhythm */
   --sp-1: 4px;
   --sp-2: 8px;
@@ -64,11 +73,11 @@
   --sp-6: 32px;
   --sp-7: 48px;
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 5px;
+  --radius: 8px;
+  --radius-lg: 12px;
 
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 30px rgba(0, 0, 0, 0.35);
+  --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.4);
 
   --dur-fast: 130ms;
   --dur: 240ms;

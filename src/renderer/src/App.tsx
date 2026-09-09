@@ -1,22 +1,31 @@
 import { useState } from 'react';
 import { useWhetstone } from './state/useWhetstone';
 import { useExplainPr } from './state/useExplainPr';
+import { useSessionMemory } from './state/useSessionMemory';
+import { useBrain } from './state/useBrain';
 import { IconRail, type AppView } from './components/IconRail';
-import { SessionSidebar } from './components/SessionSidebar';
-import { RunColumn } from './components/RunColumn';
-import { Transcript } from './components/Transcript';
-import { TerminalRunView } from './components/TerminalRunView';
-import { PromptBar } from './components/PromptBar';
+import { Sidebar } from './components/Sidebar';
+import { RunPane } from './components/RunPane';
+import { SessionBrain } from './components/SessionBrain';
+import { BrainPage } from './components/brain/BrainPage';
 import { ExplainPrPage } from './components/explain-pr/ExplainPrPage';
 
 export default function App() {
   const store = useWhetstone();
   const explain = useExplainPr();
+  const brain = useSessionMemory(store.selectedSessionId);
+  const myBrain = useBrain();
   const [view, setView] = useState<AppView>('sessions');
-  const run = store.selectedRun;
+  const [brainOpen, setBrainOpen] = useState(false);
+
+  const showBrain = view === 'sessions' && brainOpen && Boolean(store.selectedSessionId);
+
+  // Sessions is the only three-column view; the standalone tools take the
+  // whole width beside the rail.
+  const isTool = view !== 'sessions';
 
   return (
-    <div className={`app${view === 'explain-pr' ? ' is-tool' : ''}`}>
+    <div className={`app${isTool ? ' is-tool' : ''}${showBrain ? ' brain-open' : ''}`}>
       <div className="titlestrip">
         <span className="brand">
           Whet<b>stone</b>
@@ -26,37 +35,39 @@ export default function App() {
 
       {view === 'explain-pr' ? (
         <ExplainPrPage store={explain} />
+      ) : view === 'brain' ? (
+        <BrainPage store={myBrain} />
       ) : (
         <>
-          <SessionSidebar
+          <Sidebar
             sessions={store.sessions}
-            selectedId={store.selectedSessionId}
-            onSelect={store.selectSession}
-            onCreate={store.createSession}
-          />
-
-          <RunColumn
-            session={store.detail}
             selectedRunId={store.selectedRunId}
+            selectedSessionId={store.selectedSessionId}
             onSelectRun={store.selectRun}
-            onNewRun={store.createRun}
+            onSelectSession={store.selectSession}
+            onCreateSession={store.createSession}
+            onCreateRun={store.createRun}
           />
 
-          <main className="col col--transcript">
-            {run?.mode === 'terminal' ? (
-              <TerminalRunView
-                key={run.id}
-                run={run}
-                events={store.events}
-                onAnswer={store.answerQuestion}
-              />
-            ) : (
-              <>
-                <Transcript run={run} events={store.events} onAnswer={store.answerQuestion} />
-                <PromptBar run={run} onSend={store.startAgent} onCancel={store.cancelAgent} />
-              </>
-            )}
-          </main>
+          <RunPane
+            key={store.selectedRunId ?? 'none'}
+            run={store.selectedRun}
+            events={store.events}
+            brainOpen={brainOpen}
+            brainCount={brain.entries.filter((e) => e.status !== 'superseded').length}
+            onToggleBrain={() => setBrainOpen((v) => !v)}
+            onAnswer={store.answerQuestion}
+            onSend={store.startAgent}
+            onCancel={store.cancelAgent}
+          />
+
+          {showBrain && (
+            <SessionBrain
+              sessionName={store.selectedSession?.name ?? null}
+              entries={brain.entries}
+              onClose={() => setBrainOpen(false)}
+            />
+          )}
         </>
       )}
     </div>

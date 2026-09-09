@@ -6,9 +6,31 @@
  */
 
 import type { AskUserRequest, ProviderId, RunEventKind } from '@shared/models';
+import type { MemoryKind, SessionMemoryEntry } from '@shared/session-memory';
 
 /** Interactive callback a run can use to ask the human a question and wait. */
 export type AskUserFn = (request: AskUserRequest) => Promise<string>;
+
+/** What the agent supplies to the `remember` tool (run/session are stamped by the runner). */
+export interface RememberToolInput {
+  kind: MemoryKind;
+  title: string;
+  body?: string;
+  tags?: string[];
+  cwd?: string | null;
+  supersedesId?: string | null;
+}
+
+/** Write a shared-memory entry for this run's session. Returns a compact ack. */
+export type RememberFn = (
+  input: RememberToolInput,
+) => Promise<{ id: string; kind: MemoryKind; title: string }>;
+
+/** Read shared-memory entries for this run's session. */
+export type RecallFn = (input: {
+  kind?: MemoryKind;
+  query?: string;
+}) => Promise<SessionMemoryEntry[]>;
 
 /** SDK permission postures. v1 drives everything in 'plan' (no execution). */
 export type PermissionMode =
@@ -44,6 +66,15 @@ export interface LaunchParams {
   abortController: AbortController;
   /** If provided, expose an `ask_user` tool that routes through this. */
   askUser?: AskUserFn;
+  /**
+   * Compiled shared-session digest, injected into the system prompt so the
+   * agent is aware of sibling runs and the shared brain before it acts.
+   */
+  sessionContext?: string | null;
+  /** If provided, expose a `remember` tool that writes to the session brain. */
+  remember?: RememberFn;
+  /** If provided, expose a `recall` tool that reads the session brain. */
+  recall?: RecallFn;
 }
 
 export interface AgentProvider {

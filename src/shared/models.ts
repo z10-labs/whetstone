@@ -65,7 +65,16 @@ export type RunEventKind =
   | 'result'
   | 'error'
   | 'ask'
-  | 'answer';
+  | 'answer'
+  /** The run wrote to the shared session brain via the `remember` tool. */
+  | 'memory';
+
+/** The `data` shape stored on a `memory` RunEvent (mirrors a brain write). */
+export interface MemoryEventData {
+  entryId: string;
+  kind: string;
+  title: string;
+}
 
 /** One selectable option for an `ask_user` question. */
 export interface AskOption {

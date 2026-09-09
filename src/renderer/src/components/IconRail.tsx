@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type AppView = 'sessions' | 'explain-pr';
+export type AppView = 'sessions' | 'brain' | 'explain-pr';
 
 interface Props {
   view: AppView;
@@ -22,6 +22,25 @@ export function IconRail({ view, onChange }: Props) {
             stroke="currentColor"
             strokeWidth="1.6"
           />
+        </svg>
+      </RailButton>
+      <RailButton active={view === 'brain'} label="Brain" onClick={() => onChange('brain')}>
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+          <path
+            d="M9 3.4c-1.5-1.3-4-.8-4.6 1.1-1.5.5-1.9 2.4-.7 3.4-.7 1.4.3 3.1 1.9 3.2.5 1.5 2.5 2 3.4.8V3.4Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M9 3.4c1.5-1.3 4-.8 4.6 1.1 1.5.5 1.9 2.4.7 3.4.7 1.4-.3 3.1-1.9 3.2-.5 1.5-2.5 2-3.4.8V3.4Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <path d="M9 12v3.2" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       </RailButton>
       <RailButton

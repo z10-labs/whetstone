@@ -18,9 +18,14 @@ import type {
   UpdateSessionInput,
 } from '@shared/ipc';
 import type { SpecReviewDetail } from '@shared/explain-pr';
+import type { CaptureBrainInput, UpdateBrainInput } from '@shared/brain';
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
+import * as memoryRepo from '../repo/session-memory';
+import * as brainRepo from '../repo/brain';
+import { brainFilePath, writeBrainMirror } from '../brain/mirror';
+import { startReminderTicker } from '../brain/reminders';
 import { startRun, cancelRun, submitAnswer } from '../agents/runner';
 import * as explainPr from '../explain-pr/service';
 import {
@@ -77,6 +82,56 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.RunsMove, (_e, runId: string, toSessionId: string) =>
     runsRepo.moveRun(runId, toSessionId),
   );
+
+  // Session memory (the shared brain).
+  ipcMain.handle(IpcChannel.MemoryListBySession, (_e, sessionId: string) =>
+    memoryRepo.listBySession(sessionId),
+  );
+
+  // The Brain (jots, tasks, reminders). Every mutation republishes the whole
+  // board: it is small by design, so a diff protocol would cost more than it
+  // saves — and it keeps the markdown mirror and every window in step.
+  const publishBrain = async () => {
+    const items = await brainRepo.listBrain();
+    await writeBrainMirror(items);
+    broadcast(IpcEvent.BrainChanged, items);
+    return items;
+  };
+
+  ipcMain.handle(IpcChannel.BrainList, () => brainRepo.listBrain());
+  ipcMain.handle(IpcChannel.BrainCapture, async (_e, input: CaptureBrainInput) => {
+    const item = await brainRepo.captureBrainItem(input);
+    await publishBrain();
+    return item;
+  });
+  ipcMain.handle(IpcChannel.BrainUpdate, async (_e, input: UpdateBrainInput) => {
+    const item = await brainRepo.updateBrainItem(input);
+    await publishBrain();
+    return item;
+  });
+  ipcMain.handle(IpcChannel.BrainRemove, async (_e, id: string) => {
+    await brainRepo.removeBrainItem(id);
+    await publishBrain();
+  });
+  ipcMain.handle(IpcChannel.BrainClearFinished, async () => {
+    await brainRepo.clearFinishedBrainItems();
+    await publishBrain();
+  });
+  ipcMain.handle(IpcChannel.BrainMirrorPath, () => brainFilePath());
+
+  // Reminders fire on a clock in main, so they land whichever view is open.
+  startReminderTicker({
+    onChanged: () => {
+      void publishBrain().catch((err) => {
+        console.error('[whetstone] brain publish failed:', err);
+      });
+    },
+  });
+
+  // Seed the mirror on boot so agents can read the brain before it is touched.
+  void publishBrain().catch((err) => {
+    console.error('[whetstone] brain mirror seed failed:', err);
+  });
 
   // Agent driving. Fire-and-forget: the runner owns status/error reporting and
   // streams everything back over IpcEvent channels, so the invoke resolves as

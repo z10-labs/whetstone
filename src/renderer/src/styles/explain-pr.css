@@ -34,7 +34,7 @@
 .icon-rail-btn.is-active {
   color: var(--accent);
   background: var(--accent-quiet);
-  border-color: color-mix(in oklab, var(--accent) 35%, var(--line));
+  border-color: color-mix(in oklab, var(--accent) 22%, var(--line));
 }
 
 .explain-start,
@@ -61,8 +61,7 @@
   margin: 0 0 var(--sp-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--accent);
 }
 .explain-start-hero h1,
@@ -95,8 +94,7 @@
 }
 .explain-field > span {
   font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-faint);
   font-weight: 600;
 }
@@ -123,7 +121,7 @@
   outline: none;
 }
 .explain-input:focus {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--line-strong));
 }
 .explain-error {
   margin: 0;
@@ -139,8 +137,7 @@
 .explain-start-block h2 {
   margin: 0 0 var(--sp-3);
   font-size: var(--text-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-faint);
 }
 .explain-pr-list {
@@ -278,8 +275,7 @@
   display: flex;
   justify-content: space-between;
   font-size: var(--text-xs);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-dim);
   font-weight: 600;
 }
@@ -303,7 +299,7 @@
   transition: width var(--dur) var(--ease);
 }
 .spec-progress-fill.is-live {
-  background: linear-gradient(90deg, var(--accent), var(--accent-hi));
+  background: var(--accent-hi);
 }
 .spec-rail-hint {
   margin: 0;
@@ -412,10 +408,10 @@
 }
 
 .intent-card {
-  border: 1px solid color-mix(in oklab, var(--accent) 30%, var(--line));
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--line));
   border-radius: var(--radius);
   padding: 18px 20px;
-  background: linear-gradient(180deg, var(--accent-quiet), var(--bg-panel));
+  background: var(--bg-panel);
 }
 .intent-kicker {
   display: flex;
@@ -425,8 +421,7 @@
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--accent);
 }
 .intent-kicker-sub {
@@ -546,9 +541,9 @@
   align-items: center;
   gap: var(--sp-3);
   padding: 14px 16px;
-  border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--line));
+  border: 1px solid color-mix(in oklab, var(--accent) 20%, var(--line));
   border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--accent-quiet), var(--bg-panel));
+  background: var(--bg-panel);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -666,8 +661,7 @@
 .file-spec-change {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-faint);
   flex: none;
 }
@@ -759,8 +753,7 @@
   margin: 0 0 6px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-dim);
 }
 .file-spec-text {
@@ -827,8 +820,7 @@
 .file-ai-row > span {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-dim);
   flex: none;
   padding-top: 2px;

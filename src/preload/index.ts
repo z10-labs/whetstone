@@ -13,6 +13,7 @@ import {
   type TerminalExitPayload,
 } from '@shared/ipc';
 import type { SpecReviewDetail } from '@shared/explain-pr';
+import type { BrainItem } from '@shared/brain';
 import type { AgentRun, RunEvent } from '@shared/models';
 
 const api: WhetstoneApi = {
@@ -27,6 +28,17 @@ const api: WhetstoneApi = {
     create: (input) => ipcRenderer.invoke(IpcChannel.RunsCreate, input),
     listEvents: (runId) => ipcRenderer.invoke(IpcChannel.RunsListEvents, runId),
     move: (runId, toSessionId) => ipcRenderer.invoke(IpcChannel.RunsMove, runId, toSessionId),
+  },
+  memory: {
+    listBySession: (sessionId) => ipcRenderer.invoke(IpcChannel.MemoryListBySession, sessionId),
+  },
+  brain: {
+    list: () => ipcRenderer.invoke(IpcChannel.BrainList),
+    capture: (input) => ipcRenderer.invoke(IpcChannel.BrainCapture, input),
+    update: (input) => ipcRenderer.invoke(IpcChannel.BrainUpdate, input),
+    remove: (id) => ipcRenderer.invoke(IpcChannel.BrainRemove, id),
+    clearFinished: () => ipcRenderer.invoke(IpcChannel.BrainClearFinished),
+    mirrorPath: () => ipcRenderer.invoke(IpcChannel.BrainMirrorPath),
   },
   agent: {
     start: (input) => ipcRenderer.invoke(IpcChannel.AgentStart, input),
@@ -69,6 +81,11 @@ const api: WhetstoneApi = {
     const handler = (_e: unknown, payload: TerminalExitPayload) => listener(payload);
     ipcRenderer.on(IpcEvent.TerminalExit, handler);
     return () => ipcRenderer.removeListener(IpcEvent.TerminalExit, handler);
+  },
+  onBrainChanged: (listener) => {
+    const handler = (_e: unknown, items: BrainItem[]) => listener(items);
+    ipcRenderer.on(IpcEvent.BrainChanged, handler);
+    return () => ipcRenderer.removeListener(IpcEvent.BrainChanged, handler);
   },
   onExplainPrUpdated: (listener) => {
     const handler = (_e: unknown, detail: SpecReviewDetail) => listener(detail);

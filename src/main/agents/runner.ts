@@ -10,6 +10,8 @@
 
 import { randomUUID } from 'node:crypto';
 import { getProvider, DEFAULT_MODEL, DEFAULT_PERMISSION_MODE } from './registry';
+import { compileDigest } from './session-context';
+import type { RecallFn, RememberFn } from './types';
 import {
   appendEvent,
   getRun,
@@ -17,6 +19,7 @@ import {
   setRunStatus,
   setRunTitle,
 } from '../repo/runs';
+import { remember as rememberEntry, recall as recallEntries } from '../repo/session-memory';
 import type { AgentRun, AskUserRequest, RunEvent } from '@shared/models';
 
 export interface RunEmitter {
@@ -91,6 +94,36 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
       });
     };
 
+    // Shared session brain: read the digest for injection, and wire the
+    // remember/recall tools. A `remember` write is mirrored as a `memory`
+    // event so it's visible in the transcript and streamed to the UI.
+    const sessionContext = await compileDigest(run.sessionId, runId);
+
+    const remember: RememberFn = async (input) => {
+      const entry = await rememberEntry({
+        sessionId: run.sessionId,
+        runId,
+        cwd: input.cwd ?? run.cwd,
+        kind: input.kind,
+        title: input.title,
+        body: input.body,
+        tags: input.tags,
+        supersedesId: input.supersedesId,
+        createdBy: 'agent',
+      });
+      emit.onEvent(
+        await appendEvent(runId, {
+          kind: 'memory',
+          text: entry.title,
+          data: { entryId: entry.id, kind: entry.kind, title: entry.title },
+        }),
+      );
+      return { id: entry.id, kind: entry.kind, title: entry.title };
+    };
+
+    const recall: RecallFn = (input) =>
+      recallEntries({ sessionId: run.sessionId, kind: input.kind, query: input.query });
+
     const provider = getProvider(run.provider);
     for await (const ev of provider.launch({
       prompt,
@@ -100,6 +133,9 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
       permissionMode: DEFAULT_PERMISSION_MODE,
       abortController: controller,
       askUser,
+      sessionContext,
+      remember,
+      recall,
     })) {
       if (ev.externalId && !externalStamped) {
         externalStamped = true;

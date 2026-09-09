@@ -48,7 +48,7 @@ button {
 /* ---- App shell: icon rail + three columns ---- */
 .app {
   display: grid;
-  grid-template-columns: 52px 264px 340px 1fr;
+  grid-template-columns: 52px 288px 1fr;
   grid-template-rows: 38px 1fr;
   height: 100%;
   background: var(--bg-app);
@@ -64,20 +64,14 @@ button {
   flex-direction: column;
   overflow: hidden;
 }
-.col--sessions {
+.col--sidebar {
   grid-column: 2;
   grid-row: 2;
   background: var(--bg-panel);
   border-right: 1px solid var(--line);
 }
-.col--runs {
+.col--main {
   grid-column: 3;
-  grid-row: 2;
-  background: var(--bg-panel-2);
-  border-right: 1px solid var(--line);
-}
-.col--transcript {
-  grid-column: 4;
   grid-row: 2;
   background: var(--bg-inset);
 }
@@ -96,16 +90,14 @@ button {
   background: var(--bg-panel);
 }
 .titlestrip .brand {
-  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-dim);
   padding-left: 60px; /* clear the traffic lights */
 }
 .titlestrip .brand b {
-  color: var(--accent);
-  font-weight: 700;
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ---- Column headers ---- */
@@ -120,8 +112,7 @@ button {
 .col-head h2 {
   margin: 0;
   font-size: var(--text-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-faint);
   font-weight: 600;
 }
@@ -144,8 +135,9 @@ button {
     transform var(--dur-fast) var(--ease);
 }
 .icon-btn:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--text-hi);
+  border-color: var(--line-strong);
+  background: var(--bg-panel-2);
 }
 .icon-btn:active {
   transform: scale(0.94);
@@ -157,106 +149,161 @@ button {
   padding: var(--sp-3);
 }
 
-/* ---- Session list ---- */
-.session-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  transition:
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-.session-row:hover {
-  background: var(--bg-panel-2);
-}
-.session-row.is-active {
-  background: var(--bg-elevated);
-  border-color: var(--line-strong);
-}
-.session-row .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 22%, transparent);
-}
-.session-row .meta {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.session-row .name {
+/* ---- Nav tree: sessions as groups, runs as their rows ---- */
+.session-input {
+  width: 100%;
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-inset);
+  border: 1px solid color-mix(in oklab, var(--accent) 45%, var(--line-strong));
+  border-radius: var(--radius-sm);
   color: var(--text-hi);
-  font-weight: 550;
-  font-size: var(--text-base);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.session-row .sub {
-  color: var(--text-faint);
-  font-size: var(--text-xs);
-  margin-top: 2px;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  outline: none;
 }
 
-/* ---- Run list ---- */
-.run-card {
-  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--bg-panel);
-  margin-bottom: var(--sp-3);
+.nav-group {
+  margin-bottom: var(--sp-4);
+}
+
+/* Session: a flush-left label. No dot, no row treatment — it names the
+   group, it is not one of its rows. */
+.nav-group-head {
   position: relative;
-  overflow: hidden;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-1) var(--sp-1) 2px;
 }
-.run-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--status-color, var(--idle));
-}
-.run-card:hover {
-  border-color: var(--line-strong);
-}
-.run-card.is-active {
-  border-color: var(--accent);
-}
-.run-card .title {
-  color: var(--text-hi);
-  font-weight: 550;
-  font-size: var(--text-base);
-  line-height: 1.35;
-}
-.run-card .cwd {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--text-faint);
-  margin-top: var(--sp-2);
-  white-space: nowrap;
+.nav-group-name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  direction: rtl;
+  white-space: nowrap;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--track-label);
   text-align: left;
+  transition: color var(--dur-fast) var(--ease);
 }
-.run-card .row {
+.nav-group-name:hover,
+.nav-group.is-current .nav-group-name {
+  color: var(--text-dim);
+}
+
+/* The add affordance stays out of the way until the group is in play. */
+.nav-add {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.nav-group:hover .nav-add,
+.nav-group.is-current .nav-add,
+.nav-add:focus-visible,
+.nav-add[aria-expanded='true'] {
+  opacity: 1;
+}
+.nav-add:hover {
+  color: var(--text-hi);
+  background: var(--bg-elevated);
+}
+
+/* Runs: indented off a rail in the session's color. */
+.nav-runs {
+  margin-left: 5px;
+  padding-left: 9px;
+  border-left: 1px solid color-mix(in oklab, var(--session-color, var(--line)) 28%, transparent);
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.nav-group.is-current .nav-runs {
+  border-left-color: color-mix(in oklab, var(--session-color, var(--line)) 70%, transparent);
+}
+
+.nav-run {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin-top: var(--sp-3);
+  padding: 5px var(--sp-2);
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: left;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.nav-run .dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.nav-run .label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-run .when {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.nav-run:hover {
+  background: var(--bg-panel-2);
+  color: var(--text-hi);
+}
+.nav-run:hover .when {
+  opacity: 1;
+}
+.nav-run.is-active {
+  background: var(--bg-elevated);
+  color: var(--text-hi);
+}
+.nav-run.is-active .when {
+  opacity: 1;
 }
 
+.nav-empty {
+  margin: 0;
+  padding: 4px var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+/* ---- Status badge ---- */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  flex: 0 0 auto;
   font-size: var(--text-xs);
   font-family: var(--font-mono);
   color: var(--text-dim);
@@ -264,6 +311,7 @@ button {
   border: 1px solid var(--line);
   border-radius: 100px;
   padding: 2px 8px;
+  line-height: 1.5;
 }
 .badge .dot {
   width: 6px;
@@ -279,9 +327,8 @@ button {
 /* ---- Transcript ---- */
 .transcript-head {
   flex: 0 0 auto;
-  padding: var(--sp-4) var(--sp-5);
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--bg-panel), transparent);
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+  background: var(--bg-inset);
 }
 .transcript-head h1 {
   margin: 0;
@@ -327,8 +374,7 @@ button {
 }
 .event .who {
   font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: var(--track-label);
   color: var(--text-faint);
   margin-bottom: var(--sp-2);
   font-weight: 600;
@@ -347,11 +393,11 @@ button {
 }
 .event--user .who {
   text-align: right;
-  color: var(--accent);
+  color: var(--text-dim);
 }
 .event--user .bubble {
-  background: var(--accent-quiet);
-  border-color: color-mix(in oklab, var(--accent) 40%, var(--line));
+  background: var(--bg-elevated);
+  border-color: var(--line-strong);
   color: var(--text-hi);
 }
 .event--thinking .bubble {
@@ -430,15 +476,15 @@ button {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #1a1206;
+  background: var(--accent-solid);
+  color: var(--on-accent);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 .ask-card {
-  border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--line));
+  border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--line));
   border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--accent-quiet), transparent), var(--bg-panel);
+  background: var(--bg-panel);
   padding: var(--sp-4);
 }
 .ask-question {
@@ -468,12 +514,12 @@ button {
     transform var(--dur-fast) var(--ease);
 }
 .ask-option:hover {
-  border-color: var(--accent);
-  transform: translateX(2px);
+  border-color: var(--line-strong);
+  background: var(--bg-panel-2);
 }
 .ask-option.is-picked {
-  border-color: var(--accent);
-  background: var(--accent-quiet);
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--line));
+  background: var(--bg-elevated);
 }
 .ask-option input {
   margin-top: 3px;
@@ -515,7 +561,7 @@ button {
   transition: border-color var(--dur-fast) var(--ease);
 }
 .ask-other-input:focus {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--line-strong));
 }
 .ask-answered {
   display: flex;
@@ -528,8 +574,7 @@ button {
 }
 .ask-answered-label {
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-label);
   color: var(--ok);
   font-weight: 600;
 }
@@ -556,7 +601,7 @@ button {
   transition: border-color var(--dur-fast) var(--ease);
 }
 .promptbar .field:focus-within {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--line-strong));
 }
 .promptbar textarea {
   flex: 1 1 auto;
@@ -596,14 +641,14 @@ button {
   transform: translateY(1px);
 }
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1a1206;
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
+  color: var(--on-accent);
 }
 .btn--primary:hover {
-  background: var(--accent-hi);
-  border-color: var(--accent-hi);
-  color: #1a1206;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 .btn--danger {
   color: var(--err);
@@ -687,45 +732,77 @@ button {
 
 /* ---- Mode badges ---- */
 .badge--sdk {
-  color: var(--accent);
-  border-color: color-mix(in oklab, var(--accent) 30%, var(--line));
+  color: color-mix(in oklab, var(--accent-hi) 80%, var(--text));
+  border-color: color-mix(in oklab, var(--accent) 22%, var(--line));
 }
 .badge--terminal,
 .badge--mode {
   color: var(--c-cyan);
-  border-color: color-mix(in oklab, var(--c-cyan) 35%, var(--line));
+  border-color: color-mix(in oklab, var(--c-cyan) 22%, var(--line));
 }
 
-/* ---- Pane tabs (terminal run: Terminal | Transcript) ---- */
-.pane-tabs {
+/* ---- Pane bar: compact tabs on the left, run controls on the right ---- */
+.pane-bar {
   flex: 0 0 auto;
   display: flex;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-4);
+  align-items: center;
+  gap: var(--sp-3);
+  height: 34px;
+  padding: 0 var(--sp-3);
   border-bottom: 1px solid var(--line);
   background: var(--bg-panel);
 }
+.pane-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+  min-width: 0;
+}
+.pane-bar-meta .path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.pane-tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
 .pane-tabs button {
-  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
   background: none;
   color: var(--text-faint);
-  padding: 4px 12px;
+  padding: 3px 9px;
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 600;
+  font-weight: 550;
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
 }
 .pane-tabs button:hover {
   color: var(--text);
+  background: var(--bg-panel-2);
 }
 .pane-tabs button.is-active {
   color: var(--text-hi);
   background: var(--bg-elevated);
-  border-color: var(--line-strong);
+}
+.tab-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-faint);
 }
 
 /* ---- Terminal host ---- */

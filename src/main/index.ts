@@ -9,6 +9,7 @@ import { initDb, closeDb } from './db/client';
 import { registerIpc } from './ipc';
 import { killAllTerminals } from './terminal/manager';
 import { stopAllTails } from './terminal/tail';
+import { stopReminderTicker } from './brain/reminders';
 
 const isDev = !app.isPackaged;
 
@@ -62,6 +63,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  stopReminderTicker();
   stopAllTails();
   killAllTerminals();
   closeDb();

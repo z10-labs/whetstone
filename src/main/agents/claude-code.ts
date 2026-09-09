@@ -16,9 +16,21 @@
 
 import { z } from 'zod';
 import type { AgentProvider, LaunchParams, NormalizedAgentEvent } from './types';
+import { MEMORY_KINDS } from '@shared/session-memory';
 
-/** The name the model sees for our in-process ask tool. */
-const ASK_TOOL_NAME = 'mcp__whetstone__ask_user';
+/**
+ * In-process whetstone tools render as dedicated UI (question cards, memory
+ * chips) rather than generic tool rows, so their raw tool_use / tool_result
+ * echoes are suppressed in the normalized stream.
+ */
+const SUPPRESSED_TOOLS = new Set([
+  'mcp__whetstone__ask_user',
+  'mcp__whetstone__remember',
+  'mcp__whetstone__recall',
+]);
+
+/** zod enum for a memory kind, derived from the shared list. */
+const memoryKindEnum = z.enum(MEMORY_KINDS as [string, ...string[]]);
 
 /** Minimal structural view of an assistant/user content block. */
 interface ContentBlock {
@@ -50,48 +62,114 @@ export const claudeCodeProvider: AgentProvider = {
 
   async *launch(params: LaunchParams): AsyncIterable<NormalizedAgentEvent> {
     const sdk = await loadSdk();
-    const askUser = params.askUser;
+    const { askUser, remember, recall } = params;
 
-    // Track ask_user tool-call ids so we can suppress their raw tool_use /
-    // tool_result echoes — the richer `ask`/`answer` events represent them.
-    const askToolUseIds = new Set<string>();
+    // Track suppressed tool-call ids so we can drop their raw tool_use /
+    // tool_result echoes — richer events (ask/answer, memory) represent them.
+    const suppressedToolUseIds = new Set<string>();
 
-    const mcpServers = askUser
-      ? {
-          whetstone: sdk.createSdkMcpServer({
-            name: 'whetstone',
-            tools: [
-              sdk.tool(
-                'ask_user',
-                'Ask the human a clarifying question and wait for their answer. ' +
-                  'Prefer this over guessing whenever requirements are ambiguous.',
-                {
-                  question: z.string().describe('The question to ask the human.'),
-                  options: z
-                    .array(
-                      z.object({
-                        label: z.string(),
-                        description: z.string().optional(),
-                        preview: z.string().optional(),
-                      }),
-                    )
-                    .optional()
-                    .describe('Optional suggested answers the human can pick from.'),
-                  multiSelect: z.boolean().optional(),
-                },
-                async (input) => {
-                  const answer = await askUser({
-                    question: input.question,
-                    options: input.options,
-                    multiSelect: input.multiSelect,
-                  });
-                  return { content: [{ type: 'text', text: answer }] };
-                },
-              ),
-            ],
-          }),
-        }
-      : undefined;
+    // Build the in-process whetstone MCP tools that are wired for this run.
+    const tools = [];
+    if (askUser) {
+      tools.push(
+        sdk.tool(
+          'ask_user',
+          'Ask the human a clarifying question and wait for their answer. ' +
+            'Prefer this over guessing whenever requirements are ambiguous.',
+          {
+            question: z.string().describe('The question to ask the human.'),
+            options: z
+              .array(
+                z.object({
+                  label: z.string(),
+                  description: z.string().optional(),
+                  preview: z.string().optional(),
+                }),
+              )
+              .optional()
+              .describe('Optional suggested answers the human can pick from.'),
+            multiSelect: z.boolean().optional(),
+          },
+          async (input) => {
+            const answer = await askUser({
+              question: input.question,
+              options: input.options,
+              multiSelect: input.multiSelect,
+            });
+            return { content: [{ type: 'text', text: answer }] };
+          },
+        ),
+      );
+    }
+    if (remember) {
+      tools.push(
+        sdk.tool(
+          'remember',
+          'Record a durable fact in the shared session brain so other agents can ' +
+            'continue your work: a decision made, an artifact produced, an open ' +
+            'question, or a next step. Prefer this over leaving knowledge only in ' +
+            'your own transcript. Supersede an existing entry instead of duplicating it.',
+          {
+            kind: memoryKindEnum.describe(
+              'decision | open_question | next_step | artifact | note',
+            ),
+            title: z.string().describe('A short one-line summary of the fact.'),
+            body: z.string().optional().describe('Optional detail or context.'),
+            tags: z.array(z.string()).optional(),
+            cwd: z
+              .string()
+              .optional()
+              .describe('Repo/dir this pertains to. Defaults to the run directory.'),
+            supersedesId: z
+              .string()
+              .optional()
+              .describe('Id of an existing entry this one replaces.'),
+          },
+          async (input) => {
+            const ack = await remember({
+              kind: input.kind as (typeof MEMORY_KINDS)[number],
+              title: input.title,
+              body: input.body,
+              tags: input.tags,
+              cwd: input.cwd,
+              supersedesId: input.supersedesId,
+            });
+            return { content: [{ type: 'text', text: `Remembered (${ack.kind}): ${ack.title}` }] };
+          },
+        ),
+      );
+    }
+    if (recall) {
+      tools.push(
+        sdk.tool(
+          'recall',
+          'Read entries from the shared session brain. Optionally filter by kind or ' +
+            'a text query. Use this to pull detail beyond the summary you were given.',
+          {
+            kind: memoryKindEnum.optional(),
+            query: z.string().optional().describe('Case-insensitive text to match.'),
+          },
+          async (input) => {
+            const entries = await recall({
+              kind: input.kind as (typeof MEMORY_KINDS)[number] | undefined,
+              query: input.query,
+            });
+            const text =
+              entries.length === 0
+                ? 'No matching memory entries.'
+                : entries
+                    .map((e) => `- [${e.kind}] ${e.title}${e.body ? ` — ${e.body}` : ''}`)
+                    .join('\n');
+            return { content: [{ type: 'text', text }] };
+          },
+        ),
+      );
+    }
+
+    const mcpServers =
+      tools.length > 0
+        ? { whetstone: sdk.createSdkMcpServer({ name: 'whetstone', tools }) }
+        : undefined;
 
     const stream = sdk.query({
       prompt: params.prompt,
@@ -101,6 +179,15 @@ export const claudeCodeProvider: AgentProvider = {
         abortController: params.abortController,
         ...(params.permissionMode === 'bypassPermissions'
           ? { allowDangerouslySkipPermissions: true }
+          : {}),
+        ...(params.sessionContext
+          ? {
+              systemPrompt: {
+                type: 'preset' as const,
+                preset: 'claude_code' as const,
+                append: params.sessionContext,
+              },
+            }
           : {}),
         ...(mcpServers ? { mcpServers } : {}),
         ...(params.model ? { model: params.model } : {}),
@@ -130,11 +217,11 @@ export const claudeCodeProvider: AgentProvider = {
             } else if (block.type === 'thinking' && block.thinking) {
               yield { kind: 'assistant_thinking', text: block.thinking };
             } else if (block.type === 'tool_use') {
-              // The ask_user tool renders as a dedicated question card, not a
-              // generic tool_use row — record its id and skip the echo.
-              if (block.name === ASK_TOOL_NAME) {
-                if (block.id) askToolUseIds.add(block.id);
-                break;
+              // Suppressed whetstone tools render as dedicated UI (question
+              // cards, memory chips) — record the id and skip the generic echo.
+              if (block.name && SUPPRESSED_TOOLS.has(block.name)) {
+                if (block.id) suppressedToolUseIds.add(block.id);
+                continue;
               }
               yield {
                 kind: 'tool_use',
@@ -151,8 +238,9 @@ export const claudeCodeProvider: AgentProvider = {
           if (Array.isArray(content)) {
             for (const block of content as ContentBlock[]) {
               if (block.type === 'tool_result') {
-                // Skip the answer echo for ask_user — the `answer` event covers it.
-                if (block.tool_use_id && askToolUseIds.has(block.tool_use_id)) continue;
+                // Skip echoes for suppressed whetstone tools — their richer
+                // events (answer, memory) already represent them.
+                if (block.tool_use_id && suppressedToolUseIds.has(block.tool_use_id)) continue;
                 yield { kind: 'tool_result', data: { id: block.tool_use_id, content: block.content } };
               }
             }

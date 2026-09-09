@@ -1,73 +1,69 @@
 /**
- * Container hook: owns all renderer state (sessions, the selected session's
- * runs, the selected run's transcript) and the live IPC subscriptions. UI
- * components stay presentational and read from what this returns.
+ * Container hook: owns all renderer state (the session tree, the current
+ * selection, the selected run's transcript) and the live IPC subscriptions.
+ * The tree is the single source of truth — the selected session and run are
+ * derived from it, never copied, so live updates can never drift.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
-import type { RunEvent, RunMode, Session, SessionWithRuns } from '@shared/models';
+import type { AgentRun, RunEvent, RunMode, SessionWithRuns } from '@shared/models';
 
 export function useWhetstone() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [detail, setDetail] = useState<SessionWithRuns | null>(null);
+  const [sessions, setSessions] = useState<SessionWithRuns[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
 
-  const selectedSessionId = detail?.id ?? null;
-
   // Refs let the long-lived IPC listeners read the current selection.
-  const sessionIdRef = useRef<string | null>(null);
   const runIdRef = useRef<string | null>(null);
-  useEffect(() => void (sessionIdRef.current = selectedSessionId), [selectedSessionId]);
   useEffect(() => void (runIdRef.current = selectedRunId), [selectedRunId]);
 
   const refreshSessions = useCallback(async () => {
-    setSessions(await api.sessions.list());
+    const tree = await api.sessions.list();
+    setSessions(tree);
+    return tree;
   }, []);
 
-  const loadSession = useCallback(async (id: string): Promise<SessionWithRuns | null> => {
-    const d = await api.sessions.get(id);
-    setDetail(d);
-    return d;
+  const selectRun = useCallback(async (run: AgentRun) => {
+    setSelectedSessionId(run.sessionId);
+    setSelectedRunId(run.id);
+    setEvents(await api.runs.listEvents(run.id));
   }, []);
 
+  /** Selecting a session opens its most recent run, if it has one. */
   const selectSession = useCallback(
     async (id: string) => {
-      const d = await loadSession(id);
-      const latest = d?.runs.at(-1) ?? null;
+      setSelectedSessionId(id);
+      const latest = sessions.find((s) => s.id === id)?.runs.at(-1) ?? null;
       setSelectedRunId(latest?.id ?? null);
       setEvents(latest ? await api.runs.listEvents(latest.id) : []);
     },
-    [loadSession],
+    [sessions],
   );
 
-  const selectRun = useCallback(async (id: string) => {
-    setSelectedRunId(id);
-    setEvents(await api.runs.listEvents(id));
-  }, []);
-
   const createSession = useCallback(
-    async (name: string, color?: string) => {
-      const s = await api.sessions.create({ name, color });
+    async (name: string) => {
+      const s = await api.sessions.create({ name });
       await refreshSessions();
-      await selectSession(s.id);
+      setSelectedSessionId(s.id);
+      setSelectedRunId(null);
+      setEvents([]);
     },
-    [refreshSessions, selectSession],
+    [refreshSessions],
   );
 
   const createRun = useCallback(
-    async (mode: RunMode) => {
-      const sessionId = sessionIdRef.current;
-      if (!sessionId) return;
+    async (sessionId: string, mode: RunMode) => {
       const cwd = await api.dialog.pickDirectory();
       if (!cwd) return;
       const run = await api.runs.create({ sessionId, cwd, mode });
-      await loadSession(sessionId);
+      await refreshSessions();
+      setSelectedSessionId(sessionId);
       setSelectedRunId(run.id);
       setEvents([]);
     },
-    [loadSession],
+    [refreshSessions],
   );
 
   const startAgent = useCallback(async (prompt: string) => {
@@ -89,9 +85,8 @@ export function useWhetstone() {
     async (runId: string, toSessionId: string) => {
       await api.runs.move(runId, toSessionId);
       await refreshSessions();
-      if (sessionIdRef.current) await loadSession(sessionIdRef.current);
     },
-    [refreshSessions, loadSession],
+    [refreshSessions],
   );
 
   // Live streaming from main.
@@ -100,32 +95,38 @@ export function useWhetstone() {
       if (ev.runId === runIdRef.current) setEvents((prev) => [...prev, ev]);
     });
     const offUpdated = api.onRunUpdated((run) => {
-      setDetail((prev) => {
-        if (!prev) return prev;
-        if (run.sessionId !== prev.id) {
-          return { ...prev, runs: prev.runs.filter((r) => r.id !== run.id) };
-        }
-        const exists = prev.runs.some((r) => r.id === run.id);
-        const runs = exists
-          ? prev.runs.map((r) => (r.id === run.id ? run : r))
-          : [...prev.runs, run];
-        return { ...prev, runs };
-      });
-      void refreshSessions();
+      setSessions((prev) =>
+        prev.map((session) => {
+          // A moved run leaves its old group and joins the new one.
+          const without = session.runs.filter((r) => r.id !== run.id);
+          if (session.id !== run.sessionId) {
+            return without.length === session.runs.length ? session : { ...session, runs: without };
+          }
+          const existed = without.length !== session.runs.length;
+          return {
+            ...session,
+            runs: existed ? session.runs.map((r) => (r.id === run.id ? run : r)) : [...without, run],
+          };
+        }),
+      );
     });
     return () => {
       offEvent();
       offUpdated();
     };
-  }, [refreshSessions]);
+  }, []);
 
   useEffect(() => void refreshSessions(), [refreshSessions]);
 
-  const selectedRun = detail?.runs.find((r) => r.id === selectedRunId) ?? null;
+  const selectedSession = useMemo(
+    () => sessions.find((s) => s.id === selectedSessionId) ?? null,
+    [sessions, selectedSessionId],
+  );
+  const selectedRun = selectedSession?.runs.find((r) => r.id === selectedRunId) ?? null;
 
   return {
     sessions,
-    detail,
+    selectedSession,
     selectedSessionId,
     selectedRunId,
     selectedRun,

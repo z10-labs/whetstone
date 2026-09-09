@@ -60,6 +60,42 @@ CREATE TABLE IF NOT EXISTS run_events (
 );
 CREATE INDEX IF NOT EXISTS run_events_run_seq_idx ON run_events(run_id, seq);
 
+CREATE TABLE IF NOT EXISTS session_memory (
+  id            TEXT PRIMARY KEY,
+  session_id    TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  run_id        TEXT REFERENCES agent_runs(id) ON DELETE SET NULL,
+  cwd           TEXT,
+  kind          TEXT NOT NULL,
+  title         TEXT NOT NULL,
+  body          TEXT NOT NULL DEFAULT '',
+  tags          TEXT,
+  status        TEXT NOT NULL DEFAULT 'active',
+  supersedes_id TEXT,
+  created_by    TEXT NOT NULL DEFAULT 'agent',
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS session_memory_session_idx ON session_memory(session_id, status);
+CREATE INDEX IF NOT EXISTS session_memory_supersedes_idx ON session_memory(supersedes_id);
+
+CREATE TABLE IF NOT EXISTS brain_items (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL DEFAULT '',
+  status     TEXT NOT NULL DEFAULT 'open',
+  pinned     INTEGER NOT NULL DEFAULT 0,
+  due_at     INTEGER,
+  fired_at   INTEGER,
+  done_at    INTEGER,
+  session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+  created_by TEXT NOT NULL DEFAULT 'human',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS brain_items_kind_status_idx ON brain_items(kind, status);
+CREATE INDEX IF NOT EXISTS brain_items_due_idx ON brain_items(due_at);
+
 CREATE TABLE IF NOT EXISTS spec_reviews (
   id           TEXT PRIMARY KEY,
   cwd          TEXT NOT NULL,

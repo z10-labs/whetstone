@@ -70,6 +70,12 @@ export async function listRunsBySession(sessionId: string): Promise<AgentRun[]> 
   return rows.map(toRun);
 }
 
+/** Every run, oldest first — the sidebar renders the whole tree at once. */
+export async function listAllRuns(): Promise<AgentRun[]> {
+  const rows = await getDb().select().from(agentRuns).orderBy(asc(agentRuns.createdAt)).all();
+  return rows.map(toRun);
+}
+
 export async function getRun(id: string): Promise<AgentRun | null> {
   const row = await getDb().select().from(agentRuns).where(eq(agentRuns.id, id)).get();
   return row ? toRun(row) : null;

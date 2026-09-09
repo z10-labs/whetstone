@@ -7,8 +7,8 @@ import { randomUUID } from 'node:crypto';
 import { eq, desc } from 'drizzle-orm';
 import { getDb } from '../db/client';
 import { sessions, type SessionRow } from '../db/schema';
-import { listRunsBySession } from './runs';
-import type { Session, SessionWithRuns } from '@shared/models';
+import { listAllRuns, listRunsBySession } from './runs';
+import type { AgentRun, Session, SessionWithRuns } from '@shared/models';
 import type { CreateSessionInput, UpdateSessionInput } from '@shared/ipc';
 
 const DEFAULT_COLOR = 'slate';
@@ -24,9 +24,20 @@ function toSession(row: SessionRow): Session {
   };
 }
 
-export async function listSessions(): Promise<Session[]> {
+/**
+ * Every session with its runs attached. The sidebar is a tree, so it needs the
+ * whole shape in one round trip; two queries and an in-memory group beat one
+ * query per session.
+ */
+export async function listSessions(): Promise<SessionWithRuns[]> {
   const rows = await getDb().select().from(sessions).orderBy(desc(sessions.updatedAt)).all();
-  return rows.map(toSession);
+  const runsBySession = new Map<string, AgentRun[]>();
+  for (const run of await listAllRuns()) {
+    const bucket = runsBySession.get(run.sessionId);
+    if (bucket) bucket.push(run);
+    else runsBySession.set(run.sessionId, [run]);
+  }
+  return rows.map((row) => ({ ...toSession(row), runs: runsBySession.get(row.id) ?? [] }));
 }
 
 export async function createSession(input: CreateSessionInput): Promise<Session> {

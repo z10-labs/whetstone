@@ -1,7 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { CSSProperties } from 'react';
-import type { AgentRun, AskEventData, RunEvent } from '@shared/models';
-import { prettyPath, statusColorVar, statusLabel } from '../lib/ui';
+import type { AgentRun, AskEventData, MemoryEventData, RunEvent } from '@shared/models';
 import { QuestionCard } from './QuestionCard';
 
 interface Props {
@@ -40,16 +38,12 @@ export function Transcript({ run, events, onAnswer }: Props) {
     <>
       <header className="transcript-head">
         <h1>{run.title}</h1>
-        <div className="subline">
-          <span className="badge" style={{ '--status-color': statusColorVar(run.status) } as CSSProperties}>
-            <span className="dot" />
-            {run.status === 'running' ? <span className="spark" /> : null}
-            {statusLabel(run.status)}
-          </span>
-          <span className="path">{prettyPath(run.cwd)}</span>
-          {run.model && <span className="path">· {run.model}</span>}
-          {run.externalId && <span className="path">· {run.externalId.slice(0, 8)}</span>}
-        </div>
+        {(run.model || run.externalId) && (
+          <div className="subline">
+            {run.model && <span className="path">{run.model}</span>}
+            {run.externalId && <span className="path">· {run.externalId.slice(0, 8)}</span>}
+          </div>
+        )}
       </header>
 
       <div className="stream">
@@ -149,6 +143,16 @@ function EventView({ event }: { event: RunEvent }) {
           <div className="bubble">{event.text}</div>
         </div>
       );
+    case 'memory': {
+      const d = (event.data as MemoryEventData | null) ?? { kind: 'note', title: event.text ?? '' };
+      return (
+        <div className="memory-chip" title="Written to the shared session brain">
+          <span className="memory-chip-mark">🧠</span>
+          <span className="memory-chip-kind">{d.kind.replace('_', ' ')}</span>
+          <span className="memory-chip-title">{d.title || event.text}</span>
+        </div>
+      );
+    }
     default:
       return null;
   }

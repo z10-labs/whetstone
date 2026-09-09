@@ -4,28 +4,27 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { AgentRun } from '@shared/models';
 import { api } from '../lib/api';
-import { prettyPath } from '../lib/ui';
 
 const MONO =
   "'SF Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, Menlo, Consolas, monospace";
 
-/** xterm theme aligned to the app's console palette. */
+/** xterm theme aligned to the app's palette in styles/tokens.css. */
 const THEME = {
-  background: '#0b0c10',
-  foreground: '#c3c8d4',
-  cursor: '#ff8a3d',
-  cursorAccent: '#0b0c10',
-  selectionBackground: '#ff8a3d33',
-  black: '#20242e',
-  brightBlack: '#5c6373',
-  red: '#ff6b6b',
-  green: '#52d18a',
-  yellow: '#ffcf5c',
-  blue: '#4aa8ff',
-  magenta: '#b48cff',
-  cyan: '#55c9e0',
-  white: '#c3c8d4',
-  brightWhite: '#eef1f7',
+  background: '#141312',
+  foreground: '#b7b2ab',
+  cursor: '#c96442',
+  cursorAccent: '#141312',
+  selectionBackground: '#c9644233',
+  black: '#2a2826',
+  brightBlack: '#635f5a',
+  red: '#c96d6d',
+  green: '#6ea886',
+  yellow: '#c2a05e',
+  blue: '#7a9cc6',
+  magenta: '#a291c4',
+  cyan: '#7aa5b2',
+  white: '#b7b2ab',
+  brightWhite: '#ece9e4',
 };
 
 export function TerminalView({ run }: { run: AgentRun }) {
@@ -97,11 +96,11 @@ export function TerminalView({ run }: { run: AgentRun }) {
     <>
       <header className="transcript-head">
         <h1>{run.title}</h1>
-        <div className="subline">
-          <span className="badge badge--mode">terminal · claude</span>
-          <span className="path">{prettyPath(run.cwd)}</span>
-          {run.externalId && <span className="path">· {run.externalId.slice(0, 8)}</span>}
-        </div>
+        {run.externalId && (
+          <div className="subline">
+            <span className="path">{run.externalId.slice(0, 8)}</span>
+          </div>
+        )}
       </header>
       <div className="terminal-wrap">
         <div className="terminal-host" ref={hostRef} />

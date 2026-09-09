@@ -64,6 +64,73 @@ export const runEvents = sqliteTable(
   ],
 );
 
+/**
+ * Session memory — the shared "brain" for a Session. Working memory (curated,
+ * session-wide), distinct from the raw per-run `run_events` log. Append-only:
+ * an edit inserts a new row and points `supersedesId` at the old one, which is
+ * flipped to `superseded`. The launch digest only reads `status = 'active'`.
+ */
+export const sessionMemory = sqliteTable(
+  'session_memory',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    /** Run that authored the entry — the handover trail. */
+    runId: text('run_id').references(() => agentRuns.id, { onDelete: 'set null' }),
+    /** Repo/dir the fact pertains to (scoping for future relevance routing). */
+    cwd: text('cwd'),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    /** JSON string[] of freeform tags. */
+    tags: text('tags'),
+    status: text('status').notNull().default('active'),
+    /** Prior entry this one replaces (append-only edit). */
+    supersedesId: text('supersedes_id'),
+    createdBy: text('created_by').notNull().default('agent'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    index('session_memory_session_idx').on(t.sessionId, t.status),
+    index('session_memory_supersedes_idx').on(t.supersedesId),
+  ],
+);
+
+/**
+ * The Brain — the human's local working surface: jots, tasks and reminders.
+ * One table with a `kind` discriminator: the three share every column and the
+ * UI reads them together, so splitting them would buy nothing. `sessionId` is
+ * a seam for future Session linkage and is null for everything today.
+ */
+export const brainItems = sqliteTable(
+  'brain_items',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    status: text('status').notNull().default('open'),
+    pinned: integer('pinned').notNull().default(0),
+    /** When the entry should surface (reminders always; tasks optionally). */
+    dueAt: integer('due_at'),
+    /** Set once the ticker surfaced it, so a reminder never fires twice. */
+    firedAt: integer('fired_at'),
+    doneAt: integer('done_at'),
+    sessionId: text('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+    createdBy: text('created_by').notNull().default('human'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    index('brain_items_kind_status_idx').on(t.kind, t.status),
+    // Drives the reminder ticker's "what has come due" scan.
+    index('brain_items_due_idx').on(t.dueAt),
+  ],
+);
+
 export const specReviews = sqliteTable(
   'spec_reviews',
   {
@@ -153,6 +220,8 @@ export const specFileDeps = sqliteTable(
 export type SessionRow = typeof sessions.$inferSelect;
 export type AgentRunRow = typeof agentRuns.$inferSelect;
 export type RunEventRow = typeof runEvents.$inferSelect;
+export type SessionMemoryRow = typeof sessionMemory.$inferSelect;
+export type BrainItemRow = typeof brainItems.$inferSelect;
 export type SpecReviewRow = typeof specReviews.$inferSelect;
 export type SpecGoalRow = typeof specGoals.$inferSelect;
 export type SpecFileRow = typeof specFiles.$inferSelect;

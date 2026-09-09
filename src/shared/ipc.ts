@@ -11,6 +11,8 @@ import type {
   SpecReviewListItem,
 } from './explain-pr';
 import type { AgentRun, RunEvent, RunMode, Session, SessionWithRuns } from './models';
+import type { SessionMemoryEntry } from './session-memory';
+import type { BrainItem, CaptureBrainInput, UpdateBrainInput } from './brain';
 
 /** Channel names for request/response (ipcRenderer.invoke) calls. */
 export const IpcChannel = {
@@ -22,6 +24,13 @@ export const IpcChannel = {
   RunsCreate: 'runs:create',
   RunsListEvents: 'runs:list-events',
   RunsMove: 'runs:move',
+  MemoryListBySession: 'memory:list-by-session',
+  BrainList: 'brain:list',
+  BrainCapture: 'brain:capture',
+  BrainUpdate: 'brain:update',
+  BrainRemove: 'brain:remove',
+  BrainClearFinished: 'brain:clear-finished',
+  BrainMirrorPath: 'brain:mirror-path',
   AgentStart: 'agent:start',
   AgentCancel: 'agent:cancel',
   AgentAnswer: 'agent:answer',
@@ -50,6 +59,8 @@ export const IpcEvent = {
   TerminalExit: 'stream:terminal-exit',
   /** Spec review changed (fetch progress, a new emit, reviewed toggle). */
   ExplainPrUpdated: 'stream:explain-pr-updated',
+  /** The brain changed — carries the whole board, which is small by design. */
+  BrainChanged: 'stream:brain-changed',
 } as const;
 
 export interface CreateSessionInput {
@@ -127,7 +138,7 @@ export interface SetReviewedInput {
  */
 export interface WhetstoneApi {
   sessions: {
-    list(): Promise<Session[]>;
+    list(): Promise<SessionWithRuns[]>;
     create(input: CreateSessionInput): Promise<Session>;
     get(id: string): Promise<SessionWithRuns | null>;
     update(input: UpdateSessionInput): Promise<Session>;
@@ -137,6 +148,21 @@ export interface WhetstoneApi {
     create(input: CreateRunInput): Promise<AgentRun>;
     listEvents(runId: string): Promise<RunEvent[]>;
     move(runId: string, toSessionId: string): Promise<AgentRun>;
+  };
+  memory: {
+    /** The session brain: every entry (including superseded) for a session. */
+    listBySession(sessionId: string): Promise<SessionMemoryEntry[]>;
+  };
+  brain: {
+    /** Live entries plus a short tail of finished ones. */
+    list(): Promise<BrainItem[]>;
+    capture(input: CaptureBrainInput): Promise<BrainItem>;
+    update(input: UpdateBrainInput): Promise<BrainItem>;
+    remove(id: string): Promise<void>;
+    /** Sweep every finished entry off the board for good. */
+    clearFinished(): Promise<void>;
+    /** Path of the markdown mirror agents read. */
+    mirrorPath(): Promise<string>;
   };
   agent: {
     start(input: StartAgentInput): Promise<void>;
@@ -177,4 +203,6 @@ export interface WhetstoneApi {
   onTerminalExit(listener: (payload: TerminalExitPayload) => void): () => void;
   /** Subscribe to spec-review updates. Returns an unsubscribe function. */
   onExplainPrUpdated(listener: (detail: SpecReviewDetail) => void): () => void;
+  /** Subscribe to brain changes (edits elsewhere, reminders firing). */
+  onBrainChanged(listener: (items: BrainItem[]) => void): () => void;
 }
