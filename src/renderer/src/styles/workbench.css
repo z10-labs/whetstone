@@ -352,11 +352,14 @@ kbd {
   flex-direction: column;
 }
 
-/* A conversation reads best in a column, not across a wide window. */
-.run-pane .stream > *,
+/* A conversation reads best in a column, not across a wide window. The
+   stream pads itself in to the column so chips keep their natural width. */
+.run-pane .stream {
+  padding-inline: max(var(--sp-5), calc((100% - var(--reading-w)) / 2));
+}
 .run-pane .promptbar .field {
   width: 100%;
-  max-width: 820px;
+  max-width: var(--reading-w);
   margin-inline: auto;
 }
 .run-pane .promptbar {
