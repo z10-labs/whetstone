@@ -12,7 +12,7 @@ import type {
 } from './explain-pr';
 import type { AgentRun, RunEvent, RunMode, Session, SessionWithRuns } from './models';
 import type { SessionMemoryEntry } from './session-memory';
-import type { BrainItem, CaptureBrainInput, UpdateBrainInput } from './brain';
+import type { BrainItem, CaptureBrainInput, SetMissionInput, UpdateBrainInput } from './brain';
 
 /** Channel names for request/response (ipcRenderer.invoke) calls. */
 export const IpcChannel = {
@@ -30,6 +30,7 @@ export const IpcChannel = {
   BrainUpdate: 'brain:update',
   BrainRemove: 'brain:remove',
   BrainClearFinished: 'brain:clear-finished',
+  BrainSetMission: 'brain:set-mission',
   BrainMirrorPath: 'brain:mirror-path',
   AgentStart: 'agent:start',
   AgentCancel: 'agent:cancel',
@@ -158,6 +159,8 @@ export interface WhetstoneApi {
     list(): Promise<BrainItem[]>;
     capture(input: CaptureBrainInput): Promise<BrainItem>;
     update(input: UpdateBrainInput): Promise<BrainItem>;
+    /** Set or rewrite a Session's mission (created on demand). */
+    setMission(input: SetMissionInput): Promise<BrainItem>;
     remove(id: string): Promise<void>;
     /** Sweep every finished entry off the board for good. */
     clearFinished(): Promise<void>;

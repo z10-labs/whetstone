@@ -36,6 +36,7 @@ const api: WhetstoneApi = {
     list: () => ipcRenderer.invoke(IpcChannel.BrainList),
     capture: (input) => ipcRenderer.invoke(IpcChannel.BrainCapture, input),
     update: (input) => ipcRenderer.invoke(IpcChannel.BrainUpdate, input),
+    setMission: (input) => ipcRenderer.invoke(IpcChannel.BrainSetMission, input),
     remove: (id) => ipcRenderer.invoke(IpcChannel.BrainRemove, id),
     clearFinished: () => ipcRenderer.invoke(IpcChannel.BrainClearFinished),
     mirrorPath: () => ipcRenderer.invoke(IpcChannel.BrainMirrorPath),

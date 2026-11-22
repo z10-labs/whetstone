@@ -201,3 +201,88 @@
 .memory-chip-title {
   color: var(--text-hi);
 }
+
+/* ---- The session's mission, from the human's Brain, at the top of the panel ---- */
+.mission-strip {
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--session-color, var(--accent-solid));
+  border-radius: var(--radius-sm);
+}
+.mission-strip-label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.mission-strip-title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-hi);
+}
+.mission-strip-body {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+.mission-strip-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-faint);
+}
+.mission-strip-link,
+.mission-strip-set {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  color: var(--text-dim);
+  transition: color var(--dur-fast) var(--ease);
+}
+.mission-strip-link {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+.mission-strip-link:hover,
+.mission-strip-set:hover {
+  color: var(--text-hi);
+}
+.mission-strip-set {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+/* An agent wrote to the human's Brain — same chip, the Brain's ember. */
+.memory-chip--brain .memory-chip-mark {
+  color: var(--accent-hi);
+}
+.memory-chip--brain .memory-chip-kind {
+  color: var(--accent-hi);
+}
+
+/* The mission's direction in the no-run empty state. */
+.empty-mission-body {
+  max-width: 460px;
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}

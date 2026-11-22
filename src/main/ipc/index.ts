@@ -18,13 +18,14 @@ import type {
   UpdateSessionInput,
 } from '@shared/ipc';
 import type { SpecReviewDetail } from '@shared/explain-pr';
-import type { CaptureBrainInput, UpdateBrainInput } from '@shared/brain';
+import type { CaptureBrainInput, SetMissionInput, UpdateBrainInput } from '@shared/brain';
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
 import * as memoryRepo from '../repo/session-memory';
 import * as brainRepo from '../repo/brain';
-import { brainFilePath, writeBrainMirror } from '../brain/mirror';
+import { brainFilePath } from '../brain/mirror';
+import { publishBrain, setBrainBroadcaster } from '../brain/publish';
 import { startReminderTicker } from '../brain/reminders';
 import { startRun, cancelRun, submitAnswer } from '../agents/runner';
 import * as explainPr from '../explain-pr/service';
@@ -67,14 +68,27 @@ const terminalEmitter = {
 export function registerIpc(): void {
   // Sessions
   ipcMain.handle(IpcChannel.SessionsList, () => sessionsRepo.listSessions());
-  ipcMain.handle(IpcChannel.SessionsCreate, (_e, input: CreateSessionInput) =>
-    sessionsRepo.createSession(input),
-  );
+  // A Session is born with its mission: the name is the goal until reworded,
+  // the description its first lines of direction.
+  ipcMain.handle(IpcChannel.SessionsCreate, async (_e, input: CreateSessionInput) => {
+    const session = await sessionsRepo.createSession(input);
+    await brainRepo.setMission({
+      sessionId: session.id,
+      title: session.name,
+      body: session.description ?? '',
+    });
+    await publishBrain();
+    return session;
+  });
   ipcMain.handle(IpcChannel.SessionsGet, (_e, id: string) => sessionsRepo.getSessionWithRuns(id));
   ipcMain.handle(IpcChannel.SessionsUpdate, (_e, input: UpdateSessionInput) =>
     sessionsRepo.updateSession(input),
   );
-  ipcMain.handle(IpcChannel.SessionsDelete, (_e, id: string) => sessionsRepo.deleteSession(id));
+  ipcMain.handle(IpcChannel.SessionsDelete, async (_e, id: string) => {
+    await brainRepo.removeMissionForSession(id);
+    await sessionsRepo.deleteSession(id);
+    await publishBrain();
+  });
 
   // Runs
   ipcMain.handle(IpcChannel.RunsCreate, (_e, input: CreateRunInput) => runsRepo.createRun(input));
@@ -88,15 +102,10 @@ export function registerIpc(): void {
     memoryRepo.listBySession(sessionId),
   );
 
-  // The Brain (jots, tasks, reminders). Every mutation republishes the whole
-  // board: it is small by design, so a diff protocol would cost more than it
-  // saves — and it keeps the markdown mirror and every window in step.
-  const publishBrain = async () => {
-    const items = await brainRepo.listBrain();
-    await writeBrainMirror(items);
-    broadcast(IpcEvent.BrainChanged, items);
-    return items;
-  };
+  // The Brain (jots, tasks, reminders, missions). Every mutation republishes
+  // the whole board: it is small by design, so a diff protocol would cost more
+  // than it saves — and it keeps the markdown mirror and every window in step.
+  setBrainBroadcaster((items) => broadcast(IpcEvent.BrainChanged, items));
 
   ipcMain.handle(IpcChannel.BrainList, () => brainRepo.listBrain());
   ipcMain.handle(IpcChannel.BrainCapture, async (_e, input: CaptureBrainInput) => {
@@ -106,6 +115,11 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IpcChannel.BrainUpdate, async (_e, input: UpdateBrainInput) => {
     const item = await brainRepo.updateBrainItem(input);
+    await publishBrain();
+    return item;
+  });
+  ipcMain.handle(IpcChannel.BrainSetMission, async (_e, input: SetMissionInput) => {
+    const item = await brainRepo.setMission(input);
     await publishBrain();
     return item;
   });

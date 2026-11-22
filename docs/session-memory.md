@@ -8,6 +8,11 @@
 
 ---
 
+> **Update, 2026-09-12.** The digest now leads with the Session's **mission** and
+> the open Brain entries linked to the Session, and runs get a `brain` tool
+> alongside `remember`/`recall`. Session memory stays what it is — agent-written
+> state. Direction lives in the Brain. See `docs/brain.md` §2 and §4.
+
 ## 1. What session memory is
 
 Every run already produces a `RunEvent` log — the raw, append-only record of

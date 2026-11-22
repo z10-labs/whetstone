@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS brain_items (
 );
 CREATE INDEX IF NOT EXISTS brain_items_kind_status_idx ON brain_items(kind, status);
 CREATE INDEX IF NOT EXISTS brain_items_due_idx ON brain_items(due_at);
+CREATE UNIQUE INDEX IF NOT EXISTS brain_items_live_mission_idx
+  ON brain_items(session_id) WHERE kind = 'mission' AND status IN ('open', 'doing');
 
 CREATE TABLE IF NOT EXISTS spec_reviews (
   id           TEXT PRIMARY KEY,
@@ -193,8 +195,18 @@ export async function initDb(): Promise<Db> {
   const dir = join(app.getPath('userData'), 'whetstone');
   mkdirSync(dir, { recursive: true });
   const file = join(dir, 'whetstone.db');
+  return initDbAt(`file:${file}`);
+}
 
-  const client = createClient({ url: `file:${file}` });
+/**
+ * Open a database at an explicit libSQL URL and bootstrap the schema. The
+ * app goes through `initDb`; tests pass `':memory:'` to get a fresh, real
+ * SQLite per case without touching Electron.
+ */
+export async function initDbAt(url: string): Promise<Db> {
+  if (dbSingleton) return dbSingleton;
+
+  const client = createClient({ url });
   await client.executeMultiple(BOOTSTRAP_DDL);
   await ensureColumns(client);
 

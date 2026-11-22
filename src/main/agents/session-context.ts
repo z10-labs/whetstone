@@ -10,6 +10,8 @@
 
 import { getSessionWithRuns } from '../repo/sessions';
 import { listActiveBySession } from '../repo/session-memory';
+import { listBrainBySession } from '../repo/brain';
+import { brainLine } from '../brain/mirror';
 import { MEMORY_KINDS, MEMORY_KIND_LABELS, type MemoryKind } from '@shared/session-memory';
 import type { SessionMemoryEntry } from '@shared/session-memory';
 import type { AgentRun } from '@shared/models';
@@ -20,7 +22,10 @@ const PREAMBLE =
   'before acting. When you make a decision, produce an artifact, or hit an open ' +
   'question that another agent would need, record it with the `remember` tool so ' +
   'work can hand off. Use `recall` to pull older detail. Do not repeat an entry ' +
-  'that is already listed; supersede it instead if it has changed.';
+  'that is already listed; supersede it instead if it has changed. The Mission is ' +
+  "the human's own direction for this session and the open entries beneath it are " +
+  'what they are tracking; use the `brain` tool to add a task, jot or reminder the ' +
+  'human should see, to mark one done, or to set the mission if they give you one.';
 
 /** Shorten an absolute path to a readable tail for the digest. */
 function tail(path: string): string {
@@ -62,6 +67,22 @@ export async function compileDigest(
 
   lines.push('## Session');
   lines.push(session.description ? `${session.name} — ${session.description}` : session.name);
+  lines.push('');
+
+  const brain = await listBrainBySession(sessionId);
+  const mission = brain.find((i) => i.kind === 'mission') ?? null;
+  const open = brain.filter((i) => i.kind !== 'mission');
+  lines.push('## Mission');
+  if (mission) {
+    lines.push(mission.title);
+    if (mission.body) lines.push(mission.body);
+  } else {
+    lines.push('No mission set. If the human gives you one, record it with `brain` (action: mission).');
+  }
+  lines.push('');
+  lines.push('### Open in this session');
+  if (open.length === 0) lines.push('- (nothing tracked yet)');
+  else for (const item of open) lines.push(brainLine(item));
   lines.push('');
 
   lines.push(`## Runs in this session (${session.runs.length})`);

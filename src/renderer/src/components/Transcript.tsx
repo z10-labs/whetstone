@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { AgentRun, AskEventData, MemoryEventData, RunEvent } from '@shared/models';
+import type { AgentRun, AskEventData, BrainEventData, MemoryEventData, RunEvent } from '@shared/models';
 import { QuestionCard } from './QuestionCard';
 
 interface Props {
@@ -143,6 +143,20 @@ function EventView({ event }: { event: RunEvent }) {
           <div className="bubble">{event.text}</div>
         </div>
       );
+    case 'brain': {
+      const d = (event.data as BrainEventData | null) ?? {
+        kind: 'task',
+        title: event.text ?? '',
+        action: 'add' as const,
+      };
+      return (
+        <div className="memory-chip memory-chip--brain" title="Written to your Brain">
+          <span className="memory-chip-mark">✦</span>
+          <span className="memory-chip-kind">{d.action === 'done' ? 'done' : d.kind}</span>
+          <span className="memory-chip-title">{d.title || event.text}</span>
+        </div>
+      );
+    }
     case 'memory': {
       const d = (event.data as MemoryEventData | null) ?? { kind: 'note', title: event.text ?? '' };
       return (

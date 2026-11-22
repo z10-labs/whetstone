@@ -7,6 +7,7 @@
 
 import type { AskUserRequest, ProviderId, RunEventKind } from '@shared/models';
 import type { MemoryKind, SessionMemoryEntry } from '@shared/session-memory';
+import type { BrainToolInput } from '../brain/agent-tool';
 
 /** Interactive callback a run can use to ask the human a question and wait. */
 export type AskUserFn = (request: AskUserRequest) => Promise<string>;
@@ -31,6 +32,9 @@ export type RecallFn = (input: {
   kind?: MemoryKind;
   query?: string;
 }) => Promise<SessionMemoryEntry[]>;
+
+/** Act on the human's Brain for this run's session. Returns a one-line ack. */
+export type BrainFn = (input: BrainToolInput) => Promise<string>;
 
 /** SDK permission postures. v1 drives everything in 'plan' (no execution). */
 export type PermissionMode =
@@ -75,6 +79,8 @@ export interface LaunchParams {
   remember?: RememberFn;
   /** If provided, expose a `recall` tool that reads the session brain. */
   recall?: RecallFn;
+  /** If provided, expose a `brain` tool that writes to the human's Brain. */
+  brain?: BrainFn;
 }
 
 export interface AgentProvider {

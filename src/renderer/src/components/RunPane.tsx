@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { AgentRun, RunEvent } from '@shared/models';
+import type { BrainItem } from '@shared/brain';
 import { TerminalView } from './TerminalView';
 import { Transcript } from './Transcript';
 import { PromptBar } from './PromptBar';
@@ -9,6 +10,10 @@ import { prettyPath, statusColorVar, statusLabel } from '../lib/ui';
 interface Props {
   run: AgentRun | null;
   events: RunEvent[];
+  /** The selected Session's name, for the no-run state. */
+  sessionName: string | null;
+  /** The selected Session's mission, so an empty Session still shows its why. */
+  mission: BrainItem | null;
   brainOpen: boolean;
   brainCount: number;
   onToggleBrain: () => void;
@@ -27,6 +32,8 @@ type Tab = 'terminal' | 'transcript';
 export function RunPane({
   run,
   events,
+  sessionName,
+  mission,
   brainOpen,
   brainCount,
   onToggleBrain,
@@ -36,13 +43,49 @@ export function RunPane({
 }: Props) {
   const [tab, setTab] = useState<Tab>('terminal');
 
+  const brainToggle = (
+    <button
+      className={`brain-toggle${brainOpen ? ' is-active' : ''}`}
+      onClick={onToggleBrain}
+      title="Session brain — mission and shared memory across runs"
+      aria-pressed={brainOpen}
+    >
+      Brain
+      {brainCount > 0 && <span className="brain-toggle-count">{brainCount}</span>}
+    </button>
+  );
+
+  // No run yet: the Session's mission is still the thing to look at, and the
+  // panel must stay reachable so a mission can be set before the first run.
   if (!run) {
     return (
       <main className="col col--main">
+        {sessionName && (
+          <div className="pane-bar">
+            <div className="pane-tabs">
+              <button className="is-active">{sessionName}</button>
+            </div>
+            <div className="pane-bar-meta">{brainToggle}</div>
+          </div>
+        )}
         <div className="empty">
           <div className="mark">✦</div>
-          <h3>No run selected</h3>
-          <p>Pick a run in the sidebar, or start a new one, to watch the agent work.</p>
+          {mission ? (
+            <>
+              <h3>{mission.title}</h3>
+              {mission.body && <p className="empty-mission-body">{mission.body}</p>}
+              <p>No runs yet. Start one to put an agent on it.</p>
+            </>
+          ) : (
+            <>
+              <h3>{sessionName ? 'No runs yet' : 'No run selected'}</h3>
+              <p>
+                {sessionName
+                  ? 'Start a run to put an agent on this session.'
+                  : 'Pick a run in the sidebar, or start a new one, to watch the agent work.'}
+              </p>
+            </>
+          )}
         </div>
       </main>
     );
@@ -84,15 +127,7 @@ export function RunPane({
           <span className="path" title={run.cwd}>
             {prettyPath(run.cwd)}
           </span>
-          <button
-            className={`brain-toggle${brainOpen ? ' is-active' : ''}`}
-            onClick={onToggleBrain}
-            title="Session brain — shared memory across runs"
-            aria-pressed={brainOpen}
-          >
-            Brain
-            {brainCount > 0 && <span className="brain-toggle-count">{brainCount}</span>}
-          </button>
+          {brainToggle}
         </div>
       </div>
 

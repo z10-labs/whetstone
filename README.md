@@ -33,6 +33,7 @@ Scripts:
 | `npm run dev` | Electron app with HMR |
 | `npm run build` | Bundle main/preload/renderer to `out/` |
 | `npm run typecheck` | Type-check both TS projects |
+| `npm test` | Unit tests (Vitest; storage runs against in-memory SQLite) |
 
 ## Shape
 

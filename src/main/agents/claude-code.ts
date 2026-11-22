@@ -27,6 +27,7 @@ const SUPPRESSED_TOOLS = new Set([
   'mcp__whetstone__ask_user',
   'mcp__whetstone__remember',
   'mcp__whetstone__recall',
+  'mcp__whetstone__brain',
 ]);
 
 /** zod enum for a memory kind, derived from the shared list. */
@@ -62,7 +63,7 @@ export const claudeCodeProvider: AgentProvider = {
 
   async *launch(params: LaunchParams): AsyncIterable<NormalizedAgentEvent> {
     const sdk = await loadSdk();
-    const { askUser, remember, recall } = params;
+    const { askUser, remember, recall, brain } = params;
 
     // Track suppressed tool-call ids so we can drop their raw tool_use /
     // tool_result echoes — richer events (ask/answer, memory) represent them.
@@ -160,6 +161,44 @@ export const claudeCodeProvider: AgentProvider = {
                 : entries
                     .map((e) => `- [${e.kind}] ${e.title}${e.body ? ` — ${e.body}` : ''}`)
                     .join('\n');
+            return { content: [{ type: 'text', text }] };
+          },
+        ),
+      );
+    }
+
+    if (brain) {
+      tools.push(
+        sdk.tool(
+          'brain',
+          "Act on the human's own Brain for this session — the board they watch. " +
+            '`add` puts a task, jot or reminder in front of them (e.g. a reminder that ' +
+            'CI will need their approval in 20 minutes). `done` closes an entry by the ' +
+            'id shown in your context. `mission` sets or rewords the session mission ' +
+            'when the human gives you one. Keep titles to one precise line; this is ' +
+            'not where detail goes — use `remember` for facts other agents need.',
+          {
+            action: z.enum(['add', 'done', 'mission']),
+            kind: z.enum(['task', 'jot', 'reminder']).optional().describe('For add. Default task.'),
+            title: z.string().optional().describe('One line. Required for add.'),
+            body: z.string().optional().describe('At most a line or two. Usually empty.'),
+            inMinutes: z
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .describe('For add: surface it this many minutes from now. Required for reminders.'),
+            id: z.string().optional().describe('For done: the entry id, e.g. id:8f2a1c.'),
+          },
+          async (input) => {
+            const text = await brain({
+              action: input.action,
+              kind: input.kind,
+              title: input.title,
+              body: input.body,
+              inMinutes: input.inMinutes,
+              id: input.id,
+            });
             return { content: [{ type: 'text', text }] };
           },
         ),

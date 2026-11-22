@@ -25,12 +25,19 @@ export function BrainCard({ item, now, onAdvance, onRename, onPin, onRemove, chi
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Enter commits and unmounts the input, which fires blur — guard the second call.
+  const committed = useRef(false);
 
   useEffect(() => {
-    if (editing) inputRef.current?.select();
+    if (editing) {
+      committed.current = false;
+      inputRef.current?.select();
+    }
   }, [editing]);
 
   const commit = () => {
+    if (committed.current) return;
+    committed.current = true;
     const title = draft.trim();
     if (title && title !== item.title) onRename(item.id, title);
     else setDraft(item.title);
@@ -42,7 +49,11 @@ export function BrainCard({ item, now, onAdvance, onRename, onPin, onRemove, chi
   // A card with nothing to footnote gets no footer at all — an empty strip of
   // reserved space is what makes a board feel padded rather than packed.
   const hasFoot =
-    item.dueAt !== null || item.createdBy === 'agent' || item.kind === 'jot' || Boolean(children);
+    item.dueAt !== null ||
+    item.createdBy === 'agent' ||
+    item.kind === 'jot' ||
+    Boolean(item.sessionName) ||
+    Boolean(children);
 
   return (
     <article
@@ -96,6 +107,7 @@ export function BrainCard({ item, now, onAdvance, onRename, onPin, onRemove, chi
               </span>
             )}
             {item.kind === 'jot' && <span className="bcard-age">{relativeTime(item.createdAt)}</span>}
+            {item.sessionName && <span className="bcard-session">{item.sessionName}</span>}
             {item.createdBy === 'agent' && <span className="bcard-by">agent</span>}
             {children}
           </div>

@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { BrainItem } from '@shared/brain';
 import type { SessionMemoryEntry } from '@shared/session-memory';
 import { MEMORY_KINDS, MEMORY_KIND_LABELS, MEMORY_KIND_SINGULAR } from '@shared/session-memory';
 import type { MemoryKind } from '@shared/session-memory';
@@ -7,6 +8,12 @@ import { prettyPath, relativeTime } from '../lib/ui';
 interface Props {
   sessionName: string | null;
   entries: SessionMemoryEntry[];
+  /** The Session's mission from the human's Brain, if one is set. */
+  mission: BrainItem | null;
+  /** Open Brain entries linked to this Session. */
+  openCount: number;
+  onSetMission: () => void;
+  onOpenBrain: () => void;
   onClose: () => void;
 }
 
@@ -19,7 +26,15 @@ const KIND_COLOR: Record<MemoryKind, string> = {
   note: 'slate',
 };
 
-export function SessionBrain({ sessionName, entries, onClose }: Props) {
+export function SessionBrain({
+  sessionName,
+  entries,
+  mission,
+  openCount,
+  onSetMission,
+  onOpenBrain,
+  onClose,
+}: Props) {
   const active = entries.filter((e) => e.status !== 'superseded');
   const superseded = entries.filter((e) => e.status === 'superseded');
 
@@ -40,6 +55,26 @@ export function SessionBrain({ sessionName, entries, onClose }: Props) {
       </div>
 
       <div className="scroll brain-scroll">
+        <section className="mission-strip" aria-label="Session mission">
+          <span className="mission-strip-label">Mission</span>
+          {mission ? (
+            <>
+              <p className="mission-strip-title">{mission.title}</p>
+              {mission.body && <p className="mission-strip-body">{mission.body}</p>}
+              <p className="mission-strip-meta">
+                {openCount === 0 ? 'nothing open' : `${openCount} open`}
+                <button className="mission-strip-link" onClick={onOpenBrain}>
+                  edit in Brain
+                </button>
+              </p>
+            </>
+          ) : (
+            <button className="mission-strip-set" onClick={onSetMission}>
+              Set a mission for this session
+            </button>
+          )}
+        </section>
+
         {active.length === 0 ? (
           <div className="empty" style={{ paddingTop: 'var(--sp-6)' }}>
             <div className="mark">🧠</div>
