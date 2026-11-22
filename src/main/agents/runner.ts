@@ -11,7 +11,9 @@
 import { randomUUID } from 'node:crypto';
 import { getProvider, DEFAULT_MODEL, DEFAULT_PERMISSION_MODE } from './registry';
 import { compileDigest } from './session-context';
-import type { RecallFn, RememberFn } from './types';
+import type { BrainFn, RecallFn, RememberFn } from './types';
+import { applyBrainTool } from '../brain/agent-tool';
+import { publishBrain } from '../brain/publish';
 import {
   appendEvent,
   getRun,
@@ -124,6 +126,29 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
     const recall: RecallFn = (input) =>
       recallEntries({ sessionId: run.sessionId, kind: input.kind, query: input.query });
 
+    // The human's Brain. A write publishes the board (mirror + every window)
+    // and leaves a `brain` event in the transcript, so nothing an agent puts
+    // in front of the human happens out of sight.
+    const brain: BrainFn = async (input) => {
+      const { item, ack } = await applyBrainTool(input, run.sessionId);
+      // The write is committed; publishing and the transcript row are echoes.
+      // If either trips, the agent still gets its ack — otherwise it would
+      // retry a call that already succeeded and duplicate the entry.
+      try {
+        await publishBrain();
+        emit.onEvent(
+          await appendEvent(runId, {
+            kind: 'brain',
+            text: item.title,
+            data: { entryId: item.id, kind: item.kind, title: item.title, action: input.action },
+          }),
+        );
+      } catch (err) {
+        console.error('[whetstone] brain tool: write succeeded but publish failed:', err);
+      }
+      return ack;
+    };
+
     const provider = getProvider(run.provider);
     for await (const ev of provider.launch({
       prompt,
@@ -136,6 +161,7 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
       sessionContext,
       remember,
       recall,
+      brain,
     })) {
       if (ev.externalId && !externalStamped) {
         externalStamped = true;

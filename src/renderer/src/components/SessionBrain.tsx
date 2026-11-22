@@ -1,13 +1,18 @@
 import type { CSSProperties } from 'react';
+import type { BrainItem } from '@shared/brain';
 import type { SessionMemoryEntry } from '@shared/session-memory';
 import { MEMORY_KINDS, MEMORY_KIND_LABELS, MEMORY_KIND_SINGULAR } from '@shared/session-memory';
 import type { MemoryKind } from '@shared/session-memory';
 import { prettyPath, relativeTime } from '../lib/ui';
 
 interface Props {
-  sessionName: string | null;
   entries: SessionMemoryEntry[];
-  onClose: () => void;
+  /** The Session's mission from the human's Brain, if one is set. */
+  mission: BrainItem | null;
+  /** Open Brain entries linked to this Session. */
+  openCount: number;
+  onSetMission: () => void;
+  onOpenBrain: () => void;
 }
 
 /** Session accent color per memory kind, for the card swatch. */
@@ -19,7 +24,8 @@ const KIND_COLOR: Record<MemoryKind, string> = {
   note: 'slate',
 };
 
-export function SessionBrain({ sessionName, entries, onClose }: Props) {
+/** The Session tab of the Memory panel: its mission and shared memory. */
+export function SessionBrain({ entries, mission, openCount, onSetMission, onOpenBrain }: Props) {
   const active = entries.filter((e) => e.status !== 'superseded');
   const superseded = entries.filter((e) => e.status === 'superseded');
 
@@ -31,15 +37,28 @@ export function SessionBrain({ sessionName, entries, onClose }: Props) {
   }
 
   return (
-    <aside className="col col--brain brain">
-      <div className="col-head">
-        <h2>{sessionName ? `${sessionName} · Brain` : 'Session brain'}</h2>
-        <button className="icon-btn" onClick={onClose} title="Close brain" aria-label="Close brain">
-          ×
-        </button>
-      </div>
-
+    <div className="brain">
       <div className="scroll brain-scroll">
+        <section className="mission-strip" aria-label="Session mission">
+          <span className="mission-strip-label">Mission</span>
+          {mission ? (
+            <>
+              <p className="mission-strip-title">{mission.title}</p>
+              {mission.body && <p className="mission-strip-body">{mission.body}</p>}
+              <p className="mission-strip-meta">
+                {openCount === 0 ? 'nothing open' : `${openCount} open`}
+                <button className="mission-strip-link" onClick={onOpenBrain}>
+                  edit in Brain
+                </button>
+              </p>
+            </>
+          ) : (
+            <button className="mission-strip-set" onClick={onSetMission}>
+              Set a mission for this session
+            </button>
+          )}
+        </section>
+
         {active.length === 0 ? (
           <div className="empty" style={{ paddingTop: 'var(--sp-6)' }}>
             <div className="mark">🧠</div>
@@ -77,7 +96,7 @@ export function SessionBrain({ sessionName, entries, onClose }: Props) {
           </details>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -100,7 +119,7 @@ function MemoryCard({
         <span className="brain-time">{relativeTime(entry.createdAt)}</span>
       </div>
       <p className="brain-title">{entry.title}</p>
-      {entry.body && <p className="brain-body">{entry.body}</p>}
+      {entry.body && <p className="brain-card-body">{entry.body}</p>}
       {(entry.tags.length > 0 || entry.cwd) && (
         <div className="brain-meta">
           {entry.cwd && <span className="brain-cwd">{prettyPath(entry.cwd)}</span>}

@@ -1,0 +1,302 @@
+/*
+ * The transcript, read the way Claude Code reads: prose without boxes, your
+ * turns in a quiet box on the right, and the work folded into single lines
+ * that open on demand. Tokens only.
+ */
+
+.stream {
+  gap: var(--sp-3);
+  padding-top: var(--sp-6);
+  padding-bottom: var(--sp-6);
+}
+
+/* ---- Your turn ---- */
+.turn-user {
+  align-self: flex-end;
+  max-width: 82%;
+  margin: var(--sp-3) 0 var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  color: var(--text-hi);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ---- Claude's prose ---- */
+.md {
+  color: var(--text-hi);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  word-break: break-word;
+  animation: rise var(--dur) var(--ease);
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md pre,
+.md table,
+.md blockquote {
+  margin: 0 0 var(--sp-3);
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: var(--sp-5) 0 var(--sp-2);
+  color: var(--text-hi);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.md h1 {
+  font-size: var(--text-lg);
+}
+.md h2 {
+  font-size: var(--text-md);
+}
+.md h3,
+.md h4 {
+  font-size: var(--text-base);
+}
+.md ul,
+.md ol {
+  padding-left: 1.3em;
+}
+.md li + li {
+  margin-top: 4px;
+}
+.md li::marker {
+  color: var(--text-faint);
+}
+.md strong {
+  color: var(--text-hi);
+  font-weight: 650;
+}
+.md a {
+  color: var(--accent-hi);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  text-underline-offset: 2px;
+}
+.md a:hover {
+  text-decoration-color: var(--accent-hi);
+}
+.md code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  color: var(--text-hi);
+}
+.md pre {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  overflow-x: auto;
+}
+.md pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+.md blockquote {
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--line-strong);
+  color: var(--text-dim);
+}
+.md hr {
+  margin: var(--sp-4) 0;
+  border: none;
+  border-top: 1px solid var(--line);
+}
+.md table {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.md th,
+.md td {
+  padding: 6px var(--sp-3);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.md th {
+  color: var(--text-hi);
+  background: var(--bg-panel);
+  font-weight: 600;
+}
+
+/* ---- Steps: the work, one line at a time ---- */
+.step {
+  align-self: stretch;
+  margin: -2px 0;
+}
+.step-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  text-align: left;
+  transition: color var(--dur-fast) var(--ease);
+}
+.step-line:hover,
+.step.is-open > .step-line,
+.step-call.is-open > .step-line {
+  color: var(--text-hi);
+}
+.step-line:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.step-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step-text--thought {
+  font-style: italic;
+}
+.step-chevron {
+  flex: 0 0 auto;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-faint);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.step.is-open > .step-line .step-chevron,
+.step-call.is-open > .step-line .step-chevron {
+  transform: rotate(90deg);
+}
+
+.step-calls {
+  margin: var(--sp-1) 0 var(--sp-2);
+  padding: 0 0 0 var(--sp-3);
+  list-style: none;
+  border-left: 1px solid var(--line);
+}
+.step-line--sub {
+  font-size: var(--text-xs);
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.step-tool {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  color: var(--text-faint);
+}
+.step-in,
+.step-out {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.step-in {
+  color: var(--text-hi);
+}
+.step-out {
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--line);
+  color: var(--text-dim);
+}
+.step-waiting {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+.step-thought {
+  margin: var(--sp-1) 0 var(--sp-2);
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.step-spinner {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--accent-hi);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Turn edges ---- */
+.turn-working {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+.turn-end {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-1);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+.turn-end span + span::before {
+  content: '·';
+  margin-right: var(--sp-3);
+  color: var(--line-strong);
+}
+.turn-end.is-error {
+  color: var(--err);
+}
+.turn-error {
+  margin: 0;
+  padding-left: var(--sp-3);
+  border-left: 2px solid var(--err);
+  color: var(--err);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md {
+    animation: none;
+  }
+  .step-spinner {
+    animation-duration: 2.5s;
+  }
+}

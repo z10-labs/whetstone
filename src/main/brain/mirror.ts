@@ -11,7 +11,7 @@
 import { app } from 'electron';
 import { join } from 'node:path';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { isUnclaimed, type BrainItem } from '@shared/brain';
+import { isUnclaimed, shortBrainId, type BrainItem } from '@shared/brain';
 
 /**
  * The marker in each line's brackets, so a glance down the left edge reads as
@@ -24,6 +24,7 @@ function mark(item: BrainItem): string {
   if (item.status === 'doing') return '~';
   if (item.kind === 'jot') return '.';
   if (item.kind === 'reminder') return '@';
+  if (item.kind === 'mission') return '*';
   return ' ';
 }
 
@@ -42,17 +43,31 @@ function stamp(ms: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** `id:8f2a1c` — short enough to quote, long enough to be unambiguous. */
-function shortId(id: string): string {
-  return id.replace(/-/g, '').slice(0, 6);
-}
-
-function line(item: BrainItem): string {
+/**
+ * One entry as one markdown line — the same shape in the mirror and in the
+ * digest a run is launched with, so an agent reads it the same way in both.
+ */
+export function brainLine(item: BrainItem): string {
   const parts = [`- [${mark(item)}] ${item.title}`];
   if (item.body) parts.push(`— ${item.body}`);
   if (item.dueAt !== null) parts.push(`(due ${stamp(item.dueAt)})`);
-  parts.push(`\`id:${shortId(item.id)}\``);
+  if (item.sessionName) parts.push(`· ${item.sessionName}`);
+  parts.push(`\`id:${shortBrainId(item.id)}\``);
   return parts.join(' ');
+}
+
+const line = brainLine;
+
+/** A live mission: the Session, its goal, and the direction beneath. */
+function missionBlock(item: BrainItem): string {
+  // A fresh mission still carries its Session's name as the goal; say it once.
+  const head =
+    item.sessionName && item.sessionName !== item.title
+      ? `${item.sessionName} — ${item.title}`
+      : item.title;
+  const lines = [`### ${head} \`id:${shortBrainId(item.id)}\``];
+  if (item.body) lines.push(item.body);
+  return lines.join('\n') + '\n';
 }
 
 function section(heading: string, items: BrainItem[], emptyNote?: string): string {
@@ -62,15 +77,34 @@ function section(heading: string, items: BrainItem[], emptyNote?: string): strin
 
 /** Render the whole brain as the markdown an agent will read. */
 export function renderBrainMarkdown(items: BrainItem[], now: number = Date.now()): string {
+  return [
+    '<!-- Written by whetstone. Edits here are overwritten — change entries in the app. -->',
+    '',
+    '# Brain',
+    '',
+    "The working state of the human running this machine: what's in hand, what's",
+    'outstanding, what has been done, and what is waiting on a clock. Entries are',
+    'pointers, not context — read one as a direction to follow, not a briefing.',
+    '',
+    `_Updated ${stamp(now)}_`,
+    '',
+    items.length === 0 ? '_The brain is empty._\n' : renderSections(items, now),
+  ].join('\n');
+}
+
+/** The lanes, in the order a reader should meet them. */
+function renderSections(items: BrainItem[], now: number): string {
   const live = items.filter((i) => i.status === 'open' || i.status === 'doing');
   const due = live.filter((i) => isUnclaimed(i, now));
   const dueIds = new Set(due.map((i) => i.id));
-  const rest = live.filter((i) => !dueIds.has(i.id));
+  const missions = live.filter((i) => i.kind === 'mission');
+  const rest = live.filter((i) => !dueIds.has(i.id) && i.kind !== 'mission');
 
   const tasks = rest.filter((i) => i.kind === 'task');
   const byDue = (a: BrainItem, b: BrainItem) => (a.dueAt ?? 0) - (b.dueAt ?? 0);
 
-  const body = [
+  return [
+    missions.length > 0 ? `## Missions\n\n${missions.map(missionBlock).join('\n')}` : '',
     section('Due now', due),
     section(
       'In hand',
@@ -97,20 +131,6 @@ export function renderBrainMarkdown(items: BrainItem[], now: number = Date.now()
   ]
     .filter(Boolean)
     .join('\n');
-
-  return [
-    '<!-- Written by whetstone. Edits here are overwritten — change entries in the app. -->',
-    '',
-    '# Brain',
-    '',
-    "The working state of the human running this machine: what's in hand, what's",
-    'outstanding, what has been done, and what is waiting on a clock. Entries are',
-    'pointers, not context — read one as a direction to follow, not a briefing.',
-    '',
-    `_Updated ${stamp(now)}_`,
-    '',
-    body || '_The brain is empty._\n',
-  ].join('\n');
 }
 
 /**

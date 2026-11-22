@@ -67,7 +67,17 @@ export type RunEventKind =
   | 'ask'
   | 'answer'
   /** The run wrote to the shared session brain via the `remember` tool. */
-  | 'memory';
+  | 'memory'
+  /** The run wrote to the human's Brain via the `brain` tool. */
+  | 'brain';
+
+/** The `data` shape stored on a `brain` RunEvent. */
+export interface BrainEventData {
+  entryId: string;
+  kind: string;
+  title: string;
+  action: 'add' | 'done' | 'mission';
+}
 
 /** The `data` shape stored on a `memory` RunEvent (mirrors a brain write). */
 export interface MemoryEventData {

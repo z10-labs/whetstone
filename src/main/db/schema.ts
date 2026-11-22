@@ -4,6 +4,7 @@
  * are stored as text. Drizzle never leaves the repository layer.
  */
 
+import { sql } from 'drizzle-orm';
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const sessions = sqliteTable('sessions', {
@@ -128,6 +129,10 @@ export const brainItems = sqliteTable(
     index('brain_items_kind_status_idx').on(t.kind, t.status),
     // Drives the reminder ticker's "what has come due" scan.
     index('brain_items_due_idx').on(t.dueAt),
+    // One live mission per Session, enforced where it cannot race.
+    uniqueIndex('brain_items_live_mission_idx')
+      .on(t.sessionId)
+      .where(sql`kind = 'mission' AND status IN ('open', 'doing')`),
   ],
 );
 

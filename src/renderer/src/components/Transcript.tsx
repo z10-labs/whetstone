@@ -1,6 +1,9 @@
-import { useEffect, useRef } from 'react';
-import type { AgentRun, AskEventData, MemoryEventData, RunEvent } from '@shared/models';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AgentRun, AskEventData, BrainEventData, MemoryEventData, RunEvent } from '@shared/models';
 import { QuestionCard } from './QuestionCard';
+import { Markdown } from './transcript/Markdown';
+import { ToolGroup } from './transcript/ToolGroup';
+import { groupTranscript } from './transcript/steps';
 
 interface Props {
   run: AgentRun | null;
@@ -8,8 +11,14 @@ interface Props {
   onAnswer: (questionId: string, answer: string) => void;
 }
 
+/**
+ * A run read like a conversation in Claude Code: your messages in a quiet
+ * box, Claude's replies as plain prose, and the work in between folded into
+ * one line per stretch of tool calls.
+ */
 export function Transcript({ run, events, onAnswer }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const items = useMemo(() => groupTranscript(events), [events]);
 
   // Pair each answer to its question so answered cards render resolved.
   const answersByQuestion = new Map<string, string>();
@@ -34,115 +43,100 @@ export function Transcript({ run, events, onAnswer }: Props) {
     );
   }
 
-  return (
-    <>
-      <header className="transcript-head">
-        <h1>{run.title}</h1>
-        {(run.model || run.externalId) && (
-          <div className="subline">
-            {run.model && <span className="path">{run.model}</span>}
-            {run.externalId && <span className="path">· {run.externalId.slice(0, 8)}</span>}
-          </div>
-        )}
-      </header>
+  const live = run.status === 'running';
 
-      <div className="stream">
-        {events.length === 0 && (
-          <div className="empty" style={{ alignItems: 'flex-start', paddingTop: 0 }}>
-            <p>This run is idle. Send a prompt below to start it.</p>
-          </div>
-        )}
-        {events.map((ev) => {
-          // Answers are folded into their question card.
-          if (ev.kind === 'answer') return null;
-          if (ev.kind === 'ask') {
-            const data = ev.data as AskEventData;
-            return (
-              <QuestionCard
-                key={ev.id}
-                data={data}
-                answer={answersByQuestion.get(data.questionId)}
-                onAnswer={onAnswer}
-              />
-            );
-          }
-          return <EventView key={ev.id} event={ev} />;
-        })}
-        <div ref={bottomRef} />
-      </div>
-    </>
+  return (
+    <div className="stream">
+      {events.length === 0 && (
+        <div className="empty" style={{ alignItems: 'flex-start', paddingTop: 0 }}>
+          <p>This run is idle. Send a prompt below to start it.</p>
+        </div>
+      )}
+      {items.map((item) => {
+        if (item.type === 'tools') {
+          return <ToolGroup key={item.id} calls={item.calls} live={live} />;
+        }
+        const ev = item.event;
+        // Answers are folded into their question card.
+        if (ev.kind === 'answer') return null;
+        if (ev.kind === 'ask') {
+          const data = ev.data as AskEventData;
+          return (
+            <QuestionCard
+              key={ev.id}
+              data={data}
+              answer={answersByQuestion.get(data.questionId)}
+              onAnswer={onAnswer}
+            />
+          );
+        }
+        return <EventView key={ev.id} event={ev} />;
+      })}
+      {live && (
+        <div className="turn-working" aria-live="polite">
+          <span className="step-spinner" />
+          Working…
+        </div>
+      )}
+      <div ref={bottomRef} />
+    </div>
+  );
+}
+
+function Thinking({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`step${open ? ' is-open' : ''}`}>
+      <button className="step-line" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <span className="step-text step-text--thought">Thought</span>
+        <span className="step-chevron" aria-hidden>
+          ›
+        </span>
+      </button>
+      {open && <p className="step-thought">{text}</p>}
+    </div>
   );
 }
 
 function EventView({ event }: { event: RunEvent }) {
   switch (event.kind) {
     case 'user':
-      return (
-        <div className="event event--user">
-          <div className="who">You</div>
-          <div className="bubble">{event.text}</div>
-        </div>
-      );
+      return <div className="turn-user">{event.text}</div>;
     case 'assistant_text':
-      return (
-        <div className="event event--assistant">
-          <div className="who">Claude</div>
-          <div className="bubble">{event.text}</div>
-        </div>
-      );
+      return event.text ? <Markdown text={event.text} /> : null;
     case 'assistant_thinking':
-      return (
-        <div className="event event--thinking">
-          <div className="who">Thinking</div>
-          <div className="bubble">{event.text}</div>
-        </div>
-      );
-    case 'tool_use': {
-      const input = (event.data as { input?: unknown })?.input;
-      return (
-        <div className="event event--tool">
-          <div className="who">Tool call</div>
-          <div className="bubble">
-            <span className="tool-name">{event.toolName}</span>
-            {input !== undefined && <pre>{JSON.stringify(input, null, 2)}</pre>}
-          </div>
-        </div>
-      );
-    }
-    case 'tool_result':
-      return (
-        <div className="event event--tool">
-          <div className="who">Tool result</div>
-          <div className="bubble">
-            <pre>{JSON.stringify((event.data as { content?: unknown })?.content ?? event.data, null, 2)}</pre>
-          </div>
-        </div>
-      );
+      return event.text ? <Thinking text={event.text} /> : null;
     case 'result': {
       // The SDK's result text duplicates the final assistant message, so we
       // render a compact completion footer with the useful metadata instead.
       const d =
         (event.data as { isError?: boolean; numTurns?: number; totalCostUsd?: number } | null) ??
         {};
-      const cost = typeof d.totalCostUsd === 'number' ? `$${d.totalCostUsd.toFixed(4)}` : null;
+      const cost = typeof d.totalCostUsd === 'number' ? `$${d.totalCostUsd.toFixed(2)}` : null;
       return (
-        <div className={`result-chip${d.isError ? ' is-error' : ''}`}>
-          <span className="result-mark">{d.isError ? '✕' : '✓'}</span>
-          <span>{d.isError ? 'Ended with error' : 'Completed'}</span>
-          {typeof d.numTurns === 'number' && (
-            <span className="result-meta">{d.numTurns} turns</span>
-          )}
-          {cost && <span className="result-meta">{cost}</span>}
+        <div className={`turn-end${d.isError ? ' is-error' : ''}`}>
+          <span>{d.isError ? 'Ended with an error' : 'Done'}</span>
+          {typeof d.numTurns === 'number' && <span>{d.numTurns} turns</span>}
+          {cost && <span>{cost}</span>}
         </div>
       );
     }
     case 'error':
+      return <p className="turn-error">{event.text}</p>;
+    case 'brain': {
+      const d = (event.data as BrainEventData | null) ?? {
+        kind: 'task',
+        title: event.text ?? '',
+        action: 'add' as const,
+      };
       return (
-        <div className="event event--error">
-          <div className="who">Error</div>
-          <div className="bubble">{event.text}</div>
+        <div className="memory-chip memory-chip--brain" title="Written to your Brain">
+          <span className="memory-chip-mark">✦</span>
+          <span className="memory-chip-kind">{d.action === 'done' ? 'done' : d.kind}</span>
+          <span className="memory-chip-title">{d.title || event.text}</span>
         </div>
       );
+    }
     case 'memory': {
       const d = (event.data as MemoryEventData | null) ?? { kind: 'note', title: event.text ?? '' };
       return (

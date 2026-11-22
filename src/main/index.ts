@@ -13,6 +13,15 @@ import { stopReminderTicker } from './brain/reminders';
 
 const isDev = !app.isPackaged;
 
+// WHETSTONE_HOME points the whole app — database, brain mirror — at another
+// directory. For running a second, throwaway instance (tests, screenshots)
+// without touching the real brain. Must be set before `ready`.
+const homeOverride = process.env['WHETSTONE_HOME'];
+if (homeOverride) {
+  app.setPath('home', homeOverride);
+  app.setPath('userData', join(homeOverride, 'userData'));
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,

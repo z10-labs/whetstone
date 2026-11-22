@@ -1,8 +1,8 @@
 /**
  * Brain state. Main owns the truth: every mutation there republishes the whole
  * board over `onBrainChanged`, so this hook never merges — it replaces. That
- * keeps the renderer honest when a reminder fires on main's clock rather than
- * from a click here.
+ * keeps the renderer honest when a reminder fires on main's clock, or an
+ * agent writes through the `brain` tool, rather than from a click here.
  *
  * The local `now` tick exists only so relative labels ("in 25m") stay true and
  * an entry crosses into Due without a refresh.
@@ -19,6 +19,7 @@ import {
   type BrainKind,
   type BrainStatus,
   type CaptureBrainInput,
+  type SetMissionInput,
   type UpdateBrainInput,
 } from '@shared/brain';
 
@@ -49,6 +50,10 @@ export function useBrain() {
 
   const update = useCallback(async (input: UpdateBrainInput) => {
     await api.brain.update(input);
+  }, []);
+
+  const setMission = useCallback(async (input: SetMissionInput) => {
+    await api.brain.setMission(input);
   }, []);
 
   const remove = useCallback(async (id: string) => {
@@ -83,20 +88,23 @@ export function useBrain() {
     refresh,
     capture,
     update,
+    setMission,
     remove,
     clearFinished,
     advance,
   };
 }
 
+const live = (i: BrainItem) => i.status === 'open' || i.status === 'doing';
+
 /** The board's shape: one pass over the list, sorted the way each lane reads. */
 function split(items: BrainItem[], now: number) {
-  const live = items.filter((i) => i.status === 'open' || i.status === 'doing');
-  const due = live
+  const open = items.filter(live);
+  const due = open
     .filter((i) => isUnclaimed(i, now))
     .sort((a, b) => (a.dueAt ?? 0) - (b.dueAt ?? 0));
   const dueIds = new Set(due.map((i) => i.id));
-  const waiting = live.filter((i) => !dueIds.has(i.id));
+  const waiting = open.filter((i) => !dueIds.has(i.id));
 
   const ofKind = (kind: BrainKind, status?: BrainStatus) =>
     waiting.filter((i) => i.kind === kind && (status ? i.status === status : true));
@@ -105,6 +113,8 @@ function split(items: BrainItem[], now: number) {
 
   return {
     due,
+    /** Each live Session's mission, newest Session first. */
+    missions: ofKind('mission').sort(newestFirst),
     /** Tasks being worked right now. */
     doing: ofKind('task', 'doing').sort(newestFirst),
     /** Tasks not started. */
@@ -118,4 +128,19 @@ function split(items: BrainItem[], now: number) {
   };
 }
 
+/** One Session's slice of the board: its mission and what is open under it. */
+export function sessionBoard(items: BrainItem[], sessionId: string) {
+  const mine = items.filter((i) => i.sessionId === sessionId && live(i));
+  const open = mine.filter((i) => i.kind !== 'mission');
+  return {
+    mission: mine.find((i) => i.kind === 'mission') ?? null,
+    open,
+    doing: open.filter((i) => i.kind === 'task' && i.status === 'doing'),
+    outstanding: open.filter((i) => i.kind === 'task' && i.status === 'open'),
+    watching: open.filter((i) => i.kind === 'reminder'),
+    jots: open.filter((i) => i.kind === 'jot'),
+  };
+}
+
 export type BrainStore = ReturnType<typeof useBrain>;
+export type SessionBoard = ReturnType<typeof sessionBoard>;

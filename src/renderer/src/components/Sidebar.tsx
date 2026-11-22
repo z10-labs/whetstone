@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { AgentRun, RunMode, SessionWithRuns } from '@shared/models';
 import { NewRunMenu } from './NewRunMenu';
+import { BrainIcon, ExplainIcon, SessionsIcon } from './icons';
 import { relativeTime, sessionColorVar, statusColorVar } from '../lib/ui';
 
+export type AppView = 'sessions' | 'brain' | 'explain-pr';
+
 interface Props {
+  view: AppView;
+  onChangeView: (view: AppView) => void;
   sessions: SessionWithRuns[];
   selectedRunId: string | null;
   selectedSessionId: string | null;
@@ -15,11 +20,13 @@ interface Props {
 }
 
 /**
- * One navigation column: sessions are groups, their runs are the rows beneath.
- * Selecting a run is the primary action — the group header is a label with an
- * add affordance, not a destination in its own right.
+ * The one navigation column, laid out like Claude Code's: the tools up top,
+ * then every Session with its runs beneath. Selecting a run is the primary
+ * action — the group header is a label with an add affordance.
  */
 export function Sidebar({
+  view,
+  onChangeView,
   sessions,
   selectedRunId,
   selectedSessionId,
@@ -38,51 +45,116 @@ export function Sidebar({
     setCreating(false);
   }
 
+  const inSessions = view === 'sessions';
+
   return (
-    <nav className="col col--sidebar" aria-label="Sessions and runs">
-      <div className="col-head">
-        <h2>Sessions</h2>
-        <button className="icon-btn" onClick={() => setCreating((v) => !v)} title="New session">
-          +
+    <nav className="sidebar" aria-label="Whetstone">
+      <div className="side-nav">
+        <button
+          className="side-new"
+          onClick={() => {
+            onChangeView('sessions');
+            setCreating(true);
+          }}
+        >
+          <span className="side-new-plus" aria-hidden>
+            +
+          </span>
+          New session
         </button>
+        <NavItem active={inSessions} label="Sessions" onClick={() => onChangeView('sessions')}>
+          <SessionsIcon />
+        </NavItem>
+        <NavItem active={view === 'brain'} label="Brain" hint="⌘J" onClick={() => onChangeView('brain')}>
+          <BrainIcon />
+        </NavItem>
+        <NavItem
+          active={view === 'explain-pr'}
+          label="Explain PR"
+          onClick={() => onChangeView('explain-pr')}
+        >
+          <ExplainIcon />
+        </NavItem>
       </div>
 
-      <div className="scroll">
+      <div className="side-section-head">
+        <h2>Sessions</h2>
+      </div>
+
+      <div className="scroll side-scroll">
         {creating && (
           <input
             autoFocus
             className="session-input"
-            placeholder="Session name…"
+            placeholder="What is this session for?"
+            aria-label="New session name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commit();
-              if (e.key === 'Escape') setCreating(false);
+              if (e.key === 'Escape') {
+                setName('');
+                setCreating(false);
+              }
             }}
             onBlur={commit}
           />
         )}
 
         {sessions.length === 0 && !creating && (
-          <div className="empty" style={{ paddingTop: 'var(--sp-6)' }}>
-            <div className="mark">◇</div>
-            <p>No sessions yet. Create one to group your agent runs.</p>
-          </div>
+          <p className="side-empty">
+            No sessions yet. A session groups the runs and terminals for one piece of work.
+          </p>
         )}
 
         {sessions.map((session) => (
           <SessionGroup
             key={session.id}
             session={session}
-            selectedRunId={selectedRunId}
-            isCurrent={session.id === selectedSessionId}
-            onSelectRun={onSelectRun}
-            onSelectSession={onSelectSession}
-            onCreateRun={onCreateRun}
+            selectedRunId={inSessions ? selectedRunId : null}
+            isCurrent={inSessions && session.id === selectedSessionId}
+            onSelectRun={(run) => {
+              onChangeView('sessions');
+              onSelectRun(run);
+            }}
+            onSelectSession={(id) => {
+              onChangeView('sessions');
+              onSelectSession(id);
+            }}
+            onCreateRun={(id, mode) => {
+              onChangeView('sessions');
+              onCreateRun(id, mode);
+            }}
           />
         ))}
       </div>
     </nav>
+  );
+}
+
+function NavItem({
+  active,
+  label,
+  hint,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  label: string;
+  hint?: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className={`side-item${active ? ' is-active' : ''}`}
+      aria-current={active ? 'page' : undefined}
+      onClick={onClick}
+    >
+      <span className="side-item-icon">{children}</span>
+      <span className="side-item-label">{label}</span>
+      {hint && <kbd className="side-kbd">{hint}</kbd>}
+    </button>
   );
 }
 
@@ -103,6 +175,7 @@ function SessionGroup({
   onSelectSession,
   onCreateRun,
 }: GroupProps) {
+  const running = session.runs.some((r) => r.status === 'running');
   return (
     <section
       className={`nav-group${isCurrent ? ' is-current' : ''}`}
@@ -112,6 +185,7 @@ function SessionGroup({
         <button className="nav-group-name" onClick={() => onSelectSession(session.id)}>
           {session.name}
         </button>
+        {running && <span className="spark" title="A run is working" />}
         <NewRunMenu onPick={(mode) => onCreateRun(session.id, mode)} />
       </div>
 

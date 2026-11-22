@@ -45,16 +45,16 @@ button {
   background-clip: padding-box;
 }
 
-/* ---- App shell: icon rail + three columns ---- */
+/* ---- App shell: sidebar + workspace (see workbench.css) ---- */
 .app {
   display: grid;
-  grid-template-columns: 52px 288px 1fr;
-  grid-template-rows: 38px 1fr;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: var(--titlebar-h) minmax(0, 1fr);
   height: 100%;
   background: var(--bg-app);
 }
-.app.is-tool {
-  grid-template-columns: 52px 1fr;
+.app.no-sidebar {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .col {
@@ -63,41 +63,6 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-.col--sidebar {
-  grid-column: 2;
-  grid-row: 2;
-  background: var(--bg-panel);
-  border-right: 1px solid var(--line);
-}
-.col--main {
-  grid-column: 3;
-  grid-row: 2;
-  background: var(--bg-inset);
-}
-
-/* Draggable title strip (macOS hidden-inset chrome) */
-.titlestrip {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  height: 38px;
-  flex: 0 0 auto;
-  -webkit-app-region: drag;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--sp-4);
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-panel);
-}
-.titlestrip .brand {
-  font-size: var(--text-sm);
-  letter-spacing: var(--track-label);
-  color: var(--text-dim);
-  padding-left: 60px; /* clear the traffic lights */
-}
-.titlestrip .brand b {
-  color: var(--text);
-  font-weight: 600;
 }
 
 /* ---- Column headers ---- */

@@ -18,23 +18,29 @@ import type {
   UpdateSessionInput,
 } from '@shared/ipc';
 import type { SpecReviewDetail } from '@shared/explain-pr';
-import type { CaptureBrainInput, UpdateBrainInput } from '@shared/brain';
+import type { CaptureBrainInput, SetMissionInput, UpdateBrainInput } from '@shared/brain';
+import type { CreateDockTerminalInput, TerminalLaunch } from '@shared/terminals';
+import type { HippomemQueryInput } from '@shared/hippomem';
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
 import * as memoryRepo from '../repo/session-memory';
 import * as brainRepo from '../repo/brain';
-import { brainFilePath, writeBrainMirror } from '../brain/mirror';
+import { brainFilePath } from '../brain/mirror';
+import { publishBrain, setBrainBroadcaster } from '../brain/publish';
 import { startReminderTicker } from '../brain/reminders';
 import { startRun, cancelRun, submitAnswer } from '../agents/runner';
 import * as explainPr from '../explain-pr/service';
 import {
   attachTerminal,
+  isTerminalAlive,
   writeTerminal,
   resizeTerminal,
   killTerminal,
 } from '../terminal/manager';
+import * as dock from '../terminal/dock';
 import { startTail, stopTail } from '../terminal/tail';
+import * as hippomem from '../memory/hippomem';
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -47,12 +53,15 @@ const emitter = {
   onRunUpdated: (run: AgentRun) => broadcast(IpcEvent.RunUpdated, run),
 };
 
+const publishDock = () => broadcast(IpcEvent.DockChanged, dock.listDockTerminals());
+
 const terminalEmitter = {
-  onData: (runId: string, data: string) =>
-    broadcast(IpcEvent.TerminalData, { runId, data }),
-  onExit: (runId: string, exitCode: number) => {
-    stopTail(runId);
-    broadcast(IpcEvent.TerminalExit, { runId, exitCode });
+  onData: (terminalId: string, data: string) =>
+    broadcast(IpcEvent.TerminalData, { terminalId, data }),
+  onExit: (terminalId: string, exitCode: number) => {
+    if (dock.markDockTerminalExited(terminalId, exitCode)) publishDock();
+    else stopTail(terminalId);
+    broadcast(IpcEvent.TerminalExit, { terminalId, exitCode });
   },
   onSession: (runId: string, sessionId: string) => {
     void runsRepo
@@ -67,14 +76,27 @@ const terminalEmitter = {
 export function registerIpc(): void {
   // Sessions
   ipcMain.handle(IpcChannel.SessionsList, () => sessionsRepo.listSessions());
-  ipcMain.handle(IpcChannel.SessionsCreate, (_e, input: CreateSessionInput) =>
-    sessionsRepo.createSession(input),
-  );
+  // A Session is born with its mission: the name is the goal until reworded,
+  // the description its first lines of direction.
+  ipcMain.handle(IpcChannel.SessionsCreate, async (_e, input: CreateSessionInput) => {
+    const session = await sessionsRepo.createSession(input);
+    await brainRepo.setMission({
+      sessionId: session.id,
+      title: session.name,
+      body: session.description ?? '',
+    });
+    await publishBrain();
+    return session;
+  });
   ipcMain.handle(IpcChannel.SessionsGet, (_e, id: string) => sessionsRepo.getSessionWithRuns(id));
   ipcMain.handle(IpcChannel.SessionsUpdate, (_e, input: UpdateSessionInput) =>
     sessionsRepo.updateSession(input),
   );
-  ipcMain.handle(IpcChannel.SessionsDelete, (_e, id: string) => sessionsRepo.deleteSession(id));
+  ipcMain.handle(IpcChannel.SessionsDelete, async (_e, id: string) => {
+    await brainRepo.removeMissionForSession(id);
+    await sessionsRepo.deleteSession(id);
+    await publishBrain();
+  });
 
   // Runs
   ipcMain.handle(IpcChannel.RunsCreate, (_e, input: CreateRunInput) => runsRepo.createRun(input));
@@ -88,15 +110,10 @@ export function registerIpc(): void {
     memoryRepo.listBySession(sessionId),
   );
 
-  // The Brain (jots, tasks, reminders). Every mutation republishes the whole
-  // board: it is small by design, so a diff protocol would cost more than it
-  // saves — and it keeps the markdown mirror and every window in step.
-  const publishBrain = async () => {
-    const items = await brainRepo.listBrain();
-    await writeBrainMirror(items);
-    broadcast(IpcEvent.BrainChanged, items);
-    return items;
-  };
+  // The Brain (jots, tasks, reminders, missions). Every mutation republishes
+  // the whole board: it is small by design, so a diff protocol would cost more
+  // than it saves — and it keeps the markdown mirror and every window in step.
+  setBrainBroadcaster((items) => broadcast(IpcEvent.BrainChanged, items));
 
   ipcMain.handle(IpcChannel.BrainList, () => brainRepo.listBrain());
   ipcMain.handle(IpcChannel.BrainCapture, async (_e, input: CaptureBrainInput) => {
@@ -106,6 +123,11 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IpcChannel.BrainUpdate, async (_e, input: UpdateBrainInput) => {
     const item = await brainRepo.updateBrainItem(input);
+    await publishBrain();
+    return item;
+  });
+  ipcMain.handle(IpcChannel.BrainSetMission, async (_e, input: SetMissionInput) => {
+    const item = await brainRepo.setMission(input);
     await publishBrain();
     return item;
   });
@@ -148,28 +170,60 @@ export function registerIpc(): void {
     submitAnswer(input.questionId, input.answer),
   );
 
-  // Terminal runs (PTY transport).
-  ipcMain.handle(IpcChannel.TerminalAttach, (_e, input: TerminalAttachInput) => {
-    attachTerminal(
-      input.runId,
-      input.cwd,
-      input.cols,
-      input.rows,
-      input.resume ?? null,
-      terminalEmitter,
-    );
+  // Terminals (PTY transport): Claude Code terminal runs and dock tabs alike.
+  // What to launch, and where, comes from main's own records.
+  ipcMain.handle(IpcChannel.TerminalAttach, async (_e, input: TerminalAttachInput) => {
+    const { terminalId, cols, rows } = input;
+    const tab = dock.getDockTerminal(terminalId);
+    if (tab) {
+      // An exited tab stays exited until restarted; a re-attach just replays.
+      if (tab.status === 'exited' && !isTerminalAlive(terminalId)) return;
+      attachTerminal(terminalId, tab.cwd, cols, rows, dock.dockLaunch(tab), terminalEmitter);
+      return;
+    }
+    const run = await runsRepo.getRun(terminalId);
+    if (!run || run.mode !== 'terminal') throw new Error(`No terminal ${terminalId}`);
+    const launch: TerminalLaunch = { profile: 'claude', resume: run.externalId };
+    attachTerminal(run.id, run.cwd, cols, rows, launch, terminalEmitter);
     // Resumed runs already have their session id — start mirroring immediately.
-    if (input.resume) void startTail(input.runId, input.resume, emitter);
+    if (run.externalId) void startTail(run.id, run.externalId, emitter);
   });
-  ipcMain.on(IpcChannel.TerminalInput, (_e, runId: string, data: string) => {
-    writeTerminal(runId, data);
+  ipcMain.on(IpcChannel.TerminalInput, (_e, terminalId: string, data: string) => {
+    writeTerminal(terminalId, data);
   });
   ipcMain.on(IpcChannel.TerminalResize, (_e, input: TerminalResizeInput) => {
-    resizeTerminal(input.runId, input.cols, input.rows);
+    resizeTerminal(input.terminalId, input.cols, input.rows);
   });
-  ipcMain.on(IpcChannel.TerminalKill, (_e, runId: string) => {
-    killTerminal(runId);
+  ipcMain.on(IpcChannel.TerminalKill, (_e, terminalId: string) => {
+    killTerminal(terminalId);
+    stopTail(terminalId);
   });
+
+  // The dock: shell and command tabs beside the work.
+  ipcMain.handle(IpcChannel.DockList, () => dock.listDockTerminals());
+  ipcMain.handle(IpcChannel.DockCreate, (_e, input: CreateDockTerminalInput) => {
+    const tab = dock.createDockTerminal(input);
+    publishDock();
+    return tab;
+  });
+  ipcMain.handle(IpcChannel.DockRestart, (_e, id: string) => {
+    killTerminal(id);
+    const tab = dock.markDockTerminalRunning(id);
+    if (!tab) throw new Error(`No dock terminal ${id}`);
+    publishDock();
+    return tab;
+  });
+  ipcMain.handle(IpcChannel.DockClose, (_e, id: string) => {
+    killTerminal(id);
+    dock.removeDockTerminal(id);
+    publishDock();
+  });
+
+  // Hippomem: the team's engineering memory, read from its local server.
+  ipcMain.handle(IpcChannel.HippomemDecisions, (_e, cwd: string) => hippomem.listDecisions(cwd));
+  ipcMain.handle(IpcChannel.HippomemQuery, (_e, input: HippomemQueryInput) =>
+    hippomem.queryDecisions(input.cwd, input.text),
+  );
 
   const explainEmit = (detail: SpecReviewDetail) => broadcast(IpcEvent.ExplainPrUpdated, detail);
 
