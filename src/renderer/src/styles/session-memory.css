@@ -80,7 +80,8 @@
   font-weight: 550;
   color: var(--text-hi);
 }
-.brain-body {
+/* Not `.brain-body`: the Brain page owns that name for its two-column grid. */
+.brain-card-body {
   margin: var(--sp-1) 0 0;
   font-size: var(--text-sm);
   line-height: 1.5;

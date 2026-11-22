@@ -4,6 +4,8 @@ An agentic development environment. **v1 foundation:** launch Claude agent runs
 and group them into Sessions — captured as structured events, not terminal
 scrollback.
 
+![Whetstone: Sessions in the sidebar, a run's transcript in the middle, a dev server in the terminal dock and the Session's memory on the right](docs/images/workbench.png)
+
 > Direction and scope live in [`docs/whetstone-v1.md`](docs/whetstone-v1.md).
 
 ## Stack
@@ -68,6 +70,13 @@ panel on the right (⌘⇧M).
   repo from a local [Hippomem](https://github.com/z10-labs/hippomem) server
   (`hippomem serve`), and can install Hippomem's Claude Code hooks in the repo
   so terminal runs read and write it on their own.
+- **Transcripts.** Claude's replies read as prose, and the work between them
+  folds into one line per stretch of tool calls. Open a line to see each call,
+  and a call to see its input and output.
+
+  <img src="docs/images/transcript.png" alt="A transcript with a stretch of tool calls opened: three file edits and a test run showing its output" width="640">
+
+*Screenshots use seeded demo data.*
 
 ## Deferred (seam-ready, not built)
 

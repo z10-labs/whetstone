@@ -119,7 +119,7 @@ function MemoryCard({
         <span className="brain-time">{relativeTime(entry.createdAt)}</span>
       </div>
       <p className="brain-title">{entry.title}</p>
-      {entry.body && <p className="brain-body">{entry.body}</p>}
+      {entry.body && <p className="brain-card-body">{entry.body}</p>}
       {(entry.tags.length > 0 || entry.cwd) && (
         <div className="brain-meta">
           {entry.cwd && <span className="brain-cwd">{prettyPath(entry.cwd)}</span>}
