@@ -6,7 +6,6 @@ import type { MemoryKind } from '@shared/session-memory';
 import { prettyPath, relativeTime } from '../lib/ui';
 
 interface Props {
-  sessionName: string | null;
   entries: SessionMemoryEntry[];
   /** The Session's mission from the human's Brain, if one is set. */
   mission: BrainItem | null;
@@ -14,7 +13,6 @@ interface Props {
   openCount: number;
   onSetMission: () => void;
   onOpenBrain: () => void;
-  onClose: () => void;
 }
 
 /** Session accent color per memory kind, for the card swatch. */
@@ -26,15 +24,8 @@ const KIND_COLOR: Record<MemoryKind, string> = {
   note: 'slate',
 };
 
-export function SessionBrain({
-  sessionName,
-  entries,
-  mission,
-  openCount,
-  onSetMission,
-  onOpenBrain,
-  onClose,
-}: Props) {
+/** The Session tab of the Memory panel: its mission and shared memory. */
+export function SessionBrain({ entries, mission, openCount, onSetMission, onOpenBrain }: Props) {
   const active = entries.filter((e) => e.status !== 'superseded');
   const superseded = entries.filter((e) => e.status === 'superseded');
 
@@ -46,14 +37,7 @@ export function SessionBrain({
   }
 
   return (
-    <aside className="col col--brain brain">
-      <div className="col-head">
-        <h2>{sessionName ? `${sessionName} · Brain` : 'Session brain'}</h2>
-        <button className="icon-btn" onClick={onClose} title="Close brain" aria-label="Close brain">
-          ×
-        </button>
-      </div>
-
+    <div className="brain">
       <div className="scroll brain-scroll">
         <section className="mission-strip" aria-label="Session mission">
           <span className="mission-strip-label">Mission</span>
@@ -112,7 +96,7 @@ export function SessionBrain({
           </details>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
 

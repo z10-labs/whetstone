@@ -52,6 +52,23 @@ and search build on.
 
 Data lives at `~/Library/Application Support/whetstone/whetstone/whetstone.db`.
 
+## The workbench
+
+Laid out like Claude Code: Sessions and their runs in the sidebar (⌘B), the
+selected run in the middle, terminals docked beneath it (⌃\`) and memory in a
+panel on the right (⌘⇧M).
+
+- **Terminals.** One PTY layer (`src/main/terminal/`) runs three profiles:
+  `claude` (a terminal *run*: resumable, mirrored into RunEvents), `shell` and
+  `command` (dock tabs for dev servers, test watchers, git). Dock tabs belong to
+  a Session and live as long as the app. Main decides what a terminal launches,
+  never the renderer.
+- **Memory panel.** *Session* is the Session's working memory (what its runs
+  `remember`). *Hippomem* reads the team's engineering decisions for the run's
+  repo from a local [Hippomem](https://github.com/z10-labs/hippomem) server
+  (`hippomem serve`), and can install Hippomem's Claude Code hooks in the repo
+  so terminal runs read and write it on their own.
+
 ## Deferred (seam-ready, not built)
 
 Permission UI · worktree isolation · importing existing `~/.claude` sessions ·

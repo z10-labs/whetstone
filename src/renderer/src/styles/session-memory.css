@@ -1,65 +1,6 @@
 /*
- * Session brain — the shared-memory panel and its transcript chips.
- * A fifth column that slides in beside the transcript when opened.
+ * Session brain — the Session tab of the Memory panel, and its transcript chips.
  */
-
-.app.brain-open {
-  grid-template-columns: 52px 288px 1fr 320px;
-}
-
-.col--brain {
-  grid-column: 4;
-  grid-row: 2;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100%;
-  background: var(--bg-panel);
-  border-left: 1px solid var(--line);
-}
-
-/* ---- Toggle in the runs column header ---- */
-.col-head-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.brain-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: 3px var(--sp-2);
-  font-size: var(--text-xs);
-  color: var(--text-dim);
-  background: var(--bg-panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  transition:
-    color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
-}
-.brain-toggle:hover {
-  color: var(--text-hi);
-  border-color: var(--line-strong);
-}
-.brain-toggle.is-active {
-  color: var(--text-hi);
-  border-color: var(--line-strong);
-  background: var(--bg-elevated);
-}
-.brain-toggle-count {
-  min-width: 16px;
-  padding: 0 5px;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  line-height: 16px;
-  text-align: center;
-  color: var(--text-hi);
-  background: var(--line-strong);
-  border-radius: 999px;
-}
 
 /* ---- Panel body ---- */
 .brain-scroll {

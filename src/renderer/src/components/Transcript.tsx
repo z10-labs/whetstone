@@ -36,16 +36,6 @@ export function Transcript({ run, events, onAnswer }: Props) {
 
   return (
     <>
-      <header className="transcript-head">
-        <h1>{run.title}</h1>
-        {(run.model || run.externalId) && (
-          <div className="subline">
-            {run.model && <span className="path">{run.model}</span>}
-            {run.externalId && <span className="path">· {run.externalId.slice(0, 8)}</span>}
-          </div>
-        )}
-      </header>
-
       <div className="stream">
         {events.length === 0 && (
           <div className="empty" style={{ alignItems: 'flex-start', paddingTop: 0 }}>

@@ -13,6 +13,8 @@ import type {
 import type { AgentRun, RunEvent, RunMode, Session, SessionWithRuns } from './models';
 import type { SessionMemoryEntry } from './session-memory';
 import type { BrainItem, CaptureBrainInput, SetMissionInput, UpdateBrainInput } from './brain';
+import type { CreateDockTerminalInput, DockTerminal } from './terminals';
+import type { HippomemQueryInput, HippomemView } from './hippomem';
 
 /** Channel names for request/response (ipcRenderer.invoke) calls. */
 export const IpcChannel = {
@@ -40,6 +42,12 @@ export const IpcChannel = {
   TerminalInput: 'terminal:input',
   TerminalResize: 'terminal:resize',
   TerminalKill: 'terminal:kill',
+  DockList: 'dock:list',
+  DockCreate: 'dock:create',
+  DockRestart: 'dock:restart',
+  DockClose: 'dock:close',
+  HippomemDecisions: 'hippomem:decisions',
+  HippomemQuery: 'hippomem:query',
   ExplainPrList: 'explain-pr:list',
   ExplainPrListOpen: 'explain-pr:list-open',
   ExplainPrStart: 'explain-pr:start',
@@ -54,10 +62,12 @@ export const IpcEvent = {
   RunEvent: 'stream:run-event',
   /** A run's status/metadata changed (e.g. externalId assigned, completed). */
   RunUpdated: 'stream:run-updated',
-  /** Raw PTY output for a terminal run: { runId, data }. */
+  /** Raw PTY output for any terminal: { terminalId, data }. */
   TerminalData: 'stream:terminal-data',
-  /** A terminal run's PTY exited: { runId, exitCode }. */
+  /** A terminal's PTY exited: { terminalId, exitCode }. */
   TerminalExit: 'stream:terminal-exit',
+  /** The dock's terminals changed — carries every dock terminal. */
+  DockChanged: 'stream:dock-changed',
   /** Spec review changed (fetch progress, a new emit, reviewed toggle). */
   ExplainPrUpdated: 'stream:explain-pr-updated',
   /** The brain changed — carries the whole board, which is small by design. */
@@ -84,30 +94,32 @@ export interface CreateRunInput {
   title?: string;
 }
 
+/**
+ * Attach to a terminal by id: a terminal run's id or a dock terminal's id.
+ * Main decides what to launch and where from its own records — the renderer
+ * never supplies a command or a directory here.
+ */
 export interface TerminalAttachInput {
-  runId: string;
-  cwd: string;
+  terminalId: string;
   cols: number;
   rows: number;
-  /** Claude Code session id to resume, if this run has one. */
-  resume?: string | null;
 }
 
 export interface TerminalResizeInput {
-  runId: string;
+  terminalId: string;
   cols: number;
   rows: number;
 }
 
 /** Payload of the TerminalData stream event. */
 export interface TerminalDataPayload {
-  runId: string;
+  terminalId: string;
   data: string;
 }
 
 /** Payload of the TerminalExit stream event. */
 export interface TerminalExitPayload {
-  runId: string;
+  terminalId: string;
   exitCode: number;
 }
 
@@ -178,14 +190,30 @@ export interface WhetstoneApi {
     pickDirectory(): Promise<string | null>;
   };
   terminal: {
-    /** Attach to (spawning if needed) the PTY for a terminal run. */
+    /** Attach to (spawning if needed) the PTY for a terminal run or dock tab. */
     attach(input: TerminalAttachInput): Promise<void>;
     /** Send user keystrokes to the PTY. */
-    input(runId: string, data: string): void;
+    input(terminalId: string, data: string): void;
     /** Resize the PTY. */
     resize(input: TerminalResizeInput): void;
     /** Terminate the PTY. */
-    kill(runId: string): void;
+    kill(terminalId: string): void;
+  };
+  dock: {
+    /** Every shell/command tab, across Sessions. */
+    list(): Promise<DockTerminal[]>;
+    /** Open a tab; its PTY starts when a view attaches. */
+    create(input: CreateDockTerminalInput): Promise<DockTerminal>;
+    /** Start an exited tab again, in place. */
+    restart(id: string): Promise<DockTerminal>;
+    /** Kill the PTY and drop the tab. */
+    close(id: string): Promise<void>;
+  };
+  hippomem: {
+    /** Decisions in force, with the repo `cwd` belongs to. */
+    decisions(cwd: string): Promise<HippomemView>;
+    /** Search decisions, scoped to the repo `cwd` belongs to. */
+    query(input: HippomemQueryInput): Promise<HippomemView>;
   };
   explainPr: {
     list(): Promise<SpecReviewListItem[]>;
@@ -204,6 +232,8 @@ export interface WhetstoneApi {
   onTerminalData(listener: (payload: TerminalDataPayload) => void): () => void;
   /** Subscribe to PTY exit. Returns an unsubscribe function. */
   onTerminalExit(listener: (payload: TerminalExitPayload) => void): () => void;
+  /** Subscribe to dock changes. Returns an unsubscribe function. */
+  onDockChanged(listener: (terminals: DockTerminal[]) => void): () => void;
   /** Subscribe to spec-review updates. Returns an unsubscribe function. */
   onExplainPrUpdated(listener: (detail: SpecReviewDetail) => void): () => void;
   /** Subscribe to brain changes (edits elsewhere, reminders firing). */

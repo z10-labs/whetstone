@@ -19,6 +19,8 @@ import type {
 } from '@shared/ipc';
 import type { SpecReviewDetail } from '@shared/explain-pr';
 import type { CaptureBrainInput, SetMissionInput, UpdateBrainInput } from '@shared/brain';
+import type { CreateDockTerminalInput, TerminalLaunch } from '@shared/terminals';
+import type { HippomemQueryInput } from '@shared/hippomem';
 import type { AgentRun, RunEvent } from '@shared/models';
 import * as sessionsRepo from '../repo/sessions';
 import * as runsRepo from '../repo/runs';
@@ -31,11 +33,14 @@ import { startRun, cancelRun, submitAnswer } from '../agents/runner';
 import * as explainPr from '../explain-pr/service';
 import {
   attachTerminal,
+  isTerminalAlive,
   writeTerminal,
   resizeTerminal,
   killTerminal,
 } from '../terminal/manager';
+import * as dock from '../terminal/dock';
 import { startTail, stopTail } from '../terminal/tail';
+import * as hippomem from '../memory/hippomem';
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -48,12 +53,15 @@ const emitter = {
   onRunUpdated: (run: AgentRun) => broadcast(IpcEvent.RunUpdated, run),
 };
 
+const publishDock = () => broadcast(IpcEvent.DockChanged, dock.listDockTerminals());
+
 const terminalEmitter = {
-  onData: (runId: string, data: string) =>
-    broadcast(IpcEvent.TerminalData, { runId, data }),
-  onExit: (runId: string, exitCode: number) => {
-    stopTail(runId);
-    broadcast(IpcEvent.TerminalExit, { runId, exitCode });
+  onData: (terminalId: string, data: string) =>
+    broadcast(IpcEvent.TerminalData, { terminalId, data }),
+  onExit: (terminalId: string, exitCode: number) => {
+    if (dock.markDockTerminalExited(terminalId, exitCode)) publishDock();
+    else stopTail(terminalId);
+    broadcast(IpcEvent.TerminalExit, { terminalId, exitCode });
   },
   onSession: (runId: string, sessionId: string) => {
     void runsRepo
@@ -162,28 +170,60 @@ export function registerIpc(): void {
     submitAnswer(input.questionId, input.answer),
   );
 
-  // Terminal runs (PTY transport).
-  ipcMain.handle(IpcChannel.TerminalAttach, (_e, input: TerminalAttachInput) => {
-    attachTerminal(
-      input.runId,
-      input.cwd,
-      input.cols,
-      input.rows,
-      input.resume ?? null,
-      terminalEmitter,
-    );
+  // Terminals (PTY transport): Claude Code terminal runs and dock tabs alike.
+  // What to launch, and where, comes from main's own records.
+  ipcMain.handle(IpcChannel.TerminalAttach, async (_e, input: TerminalAttachInput) => {
+    const { terminalId, cols, rows } = input;
+    const tab = dock.getDockTerminal(terminalId);
+    if (tab) {
+      // An exited tab stays exited until restarted; a re-attach just replays.
+      if (tab.status === 'exited' && !isTerminalAlive(terminalId)) return;
+      attachTerminal(terminalId, tab.cwd, cols, rows, dock.dockLaunch(tab), terminalEmitter);
+      return;
+    }
+    const run = await runsRepo.getRun(terminalId);
+    if (!run || run.mode !== 'terminal') throw new Error(`No terminal ${terminalId}`);
+    const launch: TerminalLaunch = { profile: 'claude', resume: run.externalId };
+    attachTerminal(run.id, run.cwd, cols, rows, launch, terminalEmitter);
     // Resumed runs already have their session id — start mirroring immediately.
-    if (input.resume) void startTail(input.runId, input.resume, emitter);
+    if (run.externalId) void startTail(run.id, run.externalId, emitter);
   });
-  ipcMain.on(IpcChannel.TerminalInput, (_e, runId: string, data: string) => {
-    writeTerminal(runId, data);
+  ipcMain.on(IpcChannel.TerminalInput, (_e, terminalId: string, data: string) => {
+    writeTerminal(terminalId, data);
   });
   ipcMain.on(IpcChannel.TerminalResize, (_e, input: TerminalResizeInput) => {
-    resizeTerminal(input.runId, input.cols, input.rows);
+    resizeTerminal(input.terminalId, input.cols, input.rows);
   });
-  ipcMain.on(IpcChannel.TerminalKill, (_e, runId: string) => {
-    killTerminal(runId);
+  ipcMain.on(IpcChannel.TerminalKill, (_e, terminalId: string) => {
+    killTerminal(terminalId);
+    stopTail(terminalId);
   });
+
+  // The dock: shell and command tabs beside the work.
+  ipcMain.handle(IpcChannel.DockList, () => dock.listDockTerminals());
+  ipcMain.handle(IpcChannel.DockCreate, (_e, input: CreateDockTerminalInput) => {
+    const tab = dock.createDockTerminal(input);
+    publishDock();
+    return tab;
+  });
+  ipcMain.handle(IpcChannel.DockRestart, (_e, id: string) => {
+    killTerminal(id);
+    const tab = dock.markDockTerminalRunning(id);
+    if (!tab) throw new Error(`No dock terminal ${id}`);
+    publishDock();
+    return tab;
+  });
+  ipcMain.handle(IpcChannel.DockClose, (_e, id: string) => {
+    killTerminal(id);
+    dock.removeDockTerminal(id);
+    publishDock();
+  });
+
+  // Hippomem: the team's engineering memory, read from its local server.
+  ipcMain.handle(IpcChannel.HippomemDecisions, (_e, cwd: string) => hippomem.listDecisions(cwd));
+  ipcMain.handle(IpcChannel.HippomemQuery, (_e, input: HippomemQueryInput) =>
+    hippomem.queryDecisions(input.cwd, input.text),
+  );
 
   const explainEmit = (detail: SpecReviewDetail) => broadcast(IpcEvent.ExplainPrUpdated, detail);
 

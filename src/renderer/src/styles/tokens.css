@@ -79,6 +79,11 @@
 
   --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.4);
 
+  /* Workbench frame */
+  --titlebar-h: 40px;
+  --sidebar-w: 264px;
+  --inspector-w: 348px;
+
   --dur-fast: 130ms;
   --dur: 240ms;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);

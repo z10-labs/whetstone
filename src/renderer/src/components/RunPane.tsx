@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import type { AgentRun, RunEvent } from '@shared/models';
+import type { AgentRun, RunEvent, RunMode } from '@shared/models';
 import type { BrainItem } from '@shared/brain';
 import { TerminalView } from './TerminalView';
 import { Transcript } from './Transcript';
@@ -14,76 +14,59 @@ interface Props {
   sessionName: string | null;
   /** The selected Session's mission, so an empty Session still shows its why. */
   mission: BrainItem | null;
-  brainOpen: boolean;
-  brainCount: number;
-  onToggleBrain: () => void;
+  onCreateRun: (mode: RunMode) => void;
   onAnswer: (questionId: string, answer: string) => void;
   onSend: (prompt: string) => void;
   onCancel: () => void;
 }
 
-type Tab = 'terminal' | 'transcript';
+type View = 'terminal' | 'transcript';
 
 /**
- * The working pane: a compact tab bar over the run's content. Terminal runs
- * get two tabs (the live TUI and the mirrored transcript); structured runs
- * have one view, so the bar carries only the run's identity and controls.
+ * The center of the workbench: the run's identity on one line, then the run
+ * itself. A Claude Code terminal run can be watched live or read as its
+ * mirrored transcript; a structured run is always a conversation.
  */
 export function RunPane({
   run,
   events,
   sessionName,
   mission,
-  brainOpen,
-  brainCount,
-  onToggleBrain,
+  onCreateRun,
   onAnswer,
   onSend,
   onCancel,
 }: Props) {
-  const [tab, setTab] = useState<Tab>('terminal');
+  const [view, setView] = useState<View>('terminal');
 
-  const brainToggle = (
-    <button
-      className={`brain-toggle${brainOpen ? ' is-active' : ''}`}
-      onClick={onToggleBrain}
-      title="Session brain — mission and shared memory across runs"
-      aria-pressed={brainOpen}
-    >
-      Brain
-      {brainCount > 0 && <span className="brain-toggle-count">{brainCount}</span>}
-    </button>
-  );
-
-  // No run yet: the Session's mission is still the thing to look at, and the
-  // panel must stay reachable so a mission can be set before the first run.
   if (!run) {
     return (
-      <main className="col col--main">
-        {sessionName && (
-          <div className="pane-bar">
-            <div className="pane-tabs">
-              <button className="is-active">{sessionName}</button>
-            </div>
-            <div className="pane-bar-meta">{brainToggle}</div>
-          </div>
-        )}
-        <div className="empty">
-          <div className="mark">✦</div>
-          {mission ? (
+      <main className="run-pane">
+        <div className="empty run-empty">
+          {sessionName ? (
             <>
-              <h3>{mission.title}</h3>
-              {mission.body && <p className="empty-mission-body">{mission.body}</p>}
-              <p>No runs yet. Start one to put an agent on it.</p>
+              {mission && mission.title !== sessionName && (
+                <p className="run-empty-kicker">{sessionName}</p>
+              )}
+              <h3>{mission?.title ?? 'No runs yet'}</h3>
+              {mission?.body && <p className="empty-mission-body">{mission.body}</p>}
+              <div className="run-empty-actions">
+                <button className="btn btn--primary" onClick={() => onCreateRun('terminal')}>
+                  Claude Code terminal
+                </button>
+                <button className="btn" onClick={() => onCreateRun('sdk')}>
+                  Structured run
+                </button>
+              </div>
+              <p>
+                Pick a folder and put an agent on it. Shells and dev servers go in the terminal
+                dock (⌃`).
+              </p>
             </>
           ) : (
             <>
-              <h3>{sessionName ? 'No runs yet' : 'No run selected'}</h3>
-              <p>
-                {sessionName
-                  ? 'Start a run to put an agent on this session.'
-                  : 'Pick a run in the sidebar, or start a new one, to watch the agent work.'}
-              </p>
+              <h3>Nothing open</h3>
+              <p>Pick a run in the sidebar, or start a session to group a piece of work.</p>
             </>
           )}
         </div>
@@ -92,48 +75,63 @@ export function RunPane({
   }
 
   const isTerminal = run.mode === 'terminal';
-  const showTerminal = isTerminal && tab === 'terminal';
+  const showTerminal = isTerminal && view === 'terminal';
 
   return (
-    <main className="col col--main">
-      <div className="pane-bar">
-        {isTerminal ? (
-          <div className="pane-tabs">
-            <button className={tab === 'terminal' ? 'is-active' : ''} onClick={() => setTab('terminal')}>
-              Terminal
+    <main className="run-pane">
+      <header className="run-head">
+        <div className="run-id">
+          <h1 title={run.title}>{run.title}</h1>
+          <div className="run-meta">
+            <span
+              className="badge"
+              style={{ '--status-color': statusColorVar(run.status) } as CSSProperties}
+            >
+              {run.status === 'running' ? <span className="spark" /> : <span className="dot" />}
+              {statusLabel(run.status)}
+            </span>
+            <span className="run-chip">{isTerminal ? 'Claude Code' : 'SDK'}</span>
+            <span className="path" title={run.cwd}>
+              {prettyPath(run.cwd)}
+            </span>
+            {run.model && <span className="path">{run.model}</span>}
+          </div>
+        </div>
+        {isTerminal && (
+          <div className="segmented" role="tablist" aria-label="Run view">
+            <button
+              role="tab"
+              aria-selected={view === 'terminal'}
+              className={view === 'terminal' ? 'is-active' : ''}
+              onClick={() => setView('terminal')}
+            >
+              Live
             </button>
             <button
-              className={tab === 'transcript' ? 'is-active' : ''}
-              onClick={() => setTab('transcript')}
+              role="tab"
+              aria-selected={view === 'transcript'}
+              className={view === 'transcript' ? 'is-active' : ''}
+              onClick={() => setView('transcript')}
             >
               Transcript
               {events.length > 0 && <span className="tab-count">{events.length}</span>}
             </button>
           </div>
-        ) : (
-          <div className="pane-tabs">
-            <button className="is-active">Transcript</button>
-          </div>
         )}
+      </header>
 
-        <div className="pane-bar-meta">
-          <span
-            className="badge"
-            style={{ '--status-color': statusColorVar(run.status) } as CSSProperties}
-          >
-            {run.status === 'running' ? <span className="spark" /> : <span className="dot" />}
-            {statusLabel(run.status)}
-          </span>
-          <span className="path" title={run.cwd}>
-            {prettyPath(run.cwd)}
-          </span>
-          {brainToggle}
+      {/* The live terminal stays mounted while reading the transcript, so
+          flipping between them never replays or loses the TUI. */}
+      {isTerminal && (
+        <div className="run-terminal" hidden={!showTerminal}>
+          <TerminalView
+            terminalId={run.id}
+            visible={showTerminal}
+            exitNote={(code) => `— claude session exited (${code}) —`}
+          />
         </div>
-      </div>
-
-      {showTerminal ? (
-        <TerminalView run={run} />
-      ) : (
+      )}
+      {!showTerminal && (
         <>
           <Transcript run={run} events={events} onAnswer={onAnswer} />
           {!isTerminal && <PromptBar run={run} onSend={onSend} onCancel={onCancel} />}

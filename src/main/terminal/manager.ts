@@ -1,13 +1,14 @@
 /**
- * Terminal run transport. Spawns and owns one PTY per terminal-mode run,
- * running the `claude` CLI in the run's working directory. Streams raw bytes
- * to the renderer (xterm.js) and feeds keystrokes back.
+ * Terminal transport. Spawns and owns one PTY per terminal id — a Claude Code
+ * terminal run, or a shell/command tab in the dock (see `launch.ts` for how
+ * each profile starts). Streams raw bytes to the renderer (xterm.js) and feeds
+ * keystrokes back.
  *
  * node-pty is a Node-API module (ABI-stable) so it loads under Electron with no
  * per-runtime rebuild — verified before wiring. The only install fixup is the
  * spawn-helper exec bit (see scripts/fix-native.mjs).
  *
- * Resume: a terminal run has no session handle of its own, but Claude Code
+ * Resume (Claude profile only): a terminal run has no session handle of its own, but Claude Code
  * persists every session to `~/.claude/projects/<cwd>/<session_id>.jsonl`. On a
  * fresh spawn we watch for that file (matched by the `cwd` recorded inside it)
  * and report the session id back so it can be stored as the run's externalId.
@@ -19,6 +20,8 @@ import { spawn, type IPty } from 'node-pty';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readdirSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import type { TerminalLaunch } from '@shared/terminals';
+import { launchArgs } from './launch';
 
 const SHELL = process.env.SHELL || '/bin/zsh';
 
@@ -36,23 +39,16 @@ interface Session {
 }
 
 export interface TerminalEmitter {
-  onData(runId: string, data: string): void;
-  onExit(runId: string, exitCode: number): void;
-  /** Reports the captured Claude Code session id for a fresh run. */
-  onSession(runId: string, sessionId: string): void;
+  onData(terminalId: string, data: string): void;
+  onExit(terminalId: string, exitCode: number): void;
+  /** Reports the captured Claude Code session id for a fresh Claude terminal. */
+  onSession(terminalId: string, sessionId: string): void;
 }
 
 const sessions = new Map<string, Session>();
 const captureTimers = new Map<string, NodeJS.Timeout>();
 /** Session ids already bound to a run, so concurrent runs in one cwd don't collide. */
 const claimedSessionIds = new Set<string>();
-
-function launchArgs(resumeSessionId?: string | null): string[] {
-  const cmd = resumeSessionId ? `exec claude --resume ${resumeSessionId}` : 'exec claude';
-  // A login+interactive shell loads the user's PATH/rc so `claude` resolves
-  // even under a GUI launch, then hands the session straight to the CLI.
-  return ['-lic', cmd];
-}
 
 function appendBuffer(session: Session, data: string): void {
   session.buffer += data;
@@ -114,15 +110,15 @@ function findSessionId(cwd: string, sinceMs: number): string | null {
   return null;
 }
 
-function stopCapture(runId: string): void {
-  const timer = captureTimers.get(runId);
+function stopCapture(id: string): void {
+  const timer = captureTimers.get(id);
   if (timer) {
     clearInterval(timer);
-    captureTimers.delete(runId);
+    captureTimers.delete(id);
   }
 }
 
-function startCapture(runId: string, cwd: string, emit: TerminalEmitter): void {
+function startCapture(id: string, cwd: string, emit: TerminalEmitter): void {
   const since = Date.now() - 3000;
   let ticks = 0;
   const timer = setInterval(() => {
@@ -130,36 +126,36 @@ function startCapture(runId: string, cwd: string, emit: TerminalEmitter): void {
     const sessionId = findSessionId(cwd, since);
     if (sessionId) {
       claimedSessionIds.add(sessionId);
-      stopCapture(runId);
-      emit.onSession(runId, sessionId);
+      stopCapture(id);
+      emit.onSession(id, sessionId);
     } else if (ticks >= CAPTURE_MAX_TICKS) {
-      stopCapture(runId);
+      stopCapture(id);
     }
   }, CAPTURE_INTERVAL_MS);
-  captureTimers.set(runId, timer);
+  captureTimers.set(id, timer);
 }
 
 /**
- * Attach to a run's terminal. Spawns the PTY on first attach — resuming the
- * given Claude Code session id when provided — and replays buffered scrollback
- * on a re-attach so a remounted xterm shows history.
+ * Attach to a terminal. Spawns the PTY on first attach — with the given launch
+ * profile — and replays buffered scrollback on a re-attach so a remounted
+ * xterm shows history.
  */
 export function attachTerminal(
-  runId: string,
+  id: string,
   cwd: string,
   cols: number,
   rows: number,
-  resumeSessionId: string | null,
+  launch: TerminalLaunch,
   emit: TerminalEmitter,
 ): void {
-  const existing = sessions.get(runId);
+  const existing = sessions.get(id);
   if (existing) {
     existing.pty.resize(cols, rows);
-    if (existing.buffer) emit.onData(runId, existing.buffer);
+    if (existing.buffer) emit.onData(id, existing.buffer);
     return;
   }
 
-  const pty = spawn(SHELL, launchArgs(resumeSessionId), {
+  const pty = spawn(SHELL, launchArgs(launch, SHELL), {
     name: 'xterm-256color',
     cols,
     rows,
@@ -168,44 +164,52 @@ export function attachTerminal(
   });
 
   const session: Session = { pty, buffer: '' };
-  sessions.set(runId, session);
+  sessions.set(id, session);
 
   pty.onData((data) => {
     appendBuffer(session, data);
-    emit.onData(runId, data);
+    emit.onData(id, data);
   });
 
   pty.onExit(({ exitCode }) => {
-    sessions.delete(runId);
-    stopCapture(runId);
-    emit.onExit(runId, exitCode);
+    // A PTY killed on purpose was already removed by killTerminal — and the id
+    // may belong to a fresh PTY by now (a restarted tab), so stay quiet.
+    if (sessions.get(id) !== session) return;
+    sessions.delete(id);
+    stopCapture(id);
+    emit.onExit(id, exitCode);
   });
 
-  if (resumeSessionId) {
+  if (launch.profile !== 'claude') return;
+  if (launch.resume) {
     // Already known — just guard it from being re-captured by another run.
-    claimedSessionIds.add(resumeSessionId);
+    claimedSessionIds.add(launch.resume);
   } else {
-    startCapture(runId, cwd, emit);
+    startCapture(id, cwd, emit);
   }
 }
 
-export function writeTerminal(runId: string, data: string): void {
-  sessions.get(runId)?.pty.write(data);
+export function isTerminalAlive(id: string): boolean {
+  return sessions.has(id);
 }
 
-export function resizeTerminal(runId: string, cols: number, rows: number): void {
-  sessions.get(runId)?.pty.resize(cols, rows);
+export function writeTerminal(id: string, data: string): void {
+  sessions.get(id)?.pty.write(data);
 }
 
-export function killTerminal(runId: string): void {
-  stopCapture(runId);
-  const session = sessions.get(runId);
+export function resizeTerminal(id: string, cols: number, rows: number): void {
+  sessions.get(id)?.pty.resize(cols, rows);
+}
+
+export function killTerminal(id: string): void {
+  stopCapture(id);
+  const session = sessions.get(id);
   if (!session) return;
   session.pty.kill();
-  sessions.delete(runId);
+  sessions.delete(id);
 }
 
 /** Kill every PTY (called on app shutdown). */
 export function killAllTerminals(): void {
-  for (const [runId] of sessions) killTerminal(runId);
+  for (const [id] of sessions) killTerminal(id);
 }

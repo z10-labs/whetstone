@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import type { AgentRun } from '@shared/models';
 import { api } from '../lib/api';
 
 const MONO =
@@ -27,13 +26,28 @@ const THEME = {
   brightWhite: '#ece9e4',
 };
 
-export function TerminalView({ run }: { run: AgentRun }) {
+interface Props {
+  /** A terminal run's id or a dock tab's id; main knows what to launch. */
+  terminalId: string;
+  /** Hidden terminals stay mounted (and keep scrollback) but skip fitting. */
+  visible?: boolean;
+  /** Line written when the process ends. */
+  exitNote: (exitCode: number) => string;
+}
+
+/**
+ * One xterm bound to one PTY. Mounting attaches (spawning on first attach,
+ * replaying scrollback after); the view itself never decides what runs.
+ */
+export function TerminalView({ terminalId, visible = true, exitNote }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<{ term: Terminal; refit: () => void } | null>(null);
+  const exitNoteRef = useRef(exitNote);
+  exitNoteRef.current = exitNote;
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const runId = run.id;
 
     const term = new Terminal({
       fontFamily: MONO,
@@ -46,65 +60,64 @@ export function TerminalView({ run }: { run: AgentRun }) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-    fit.fit();
 
-    // Keystrokes → PTY.
-    const keyDisposable = term.onData((data) => api.terminal.input(runId, data));
-
-    // PTY output → xterm (buffer replay arrives here on attach too).
-    const offData = api.onTerminalData((payload) => {
-      if (payload.runId === runId) term.write(payload.data);
-    });
-    const offExit = api.onTerminalExit((payload) => {
-      if (payload.runId === runId) {
-        term.write(`\r\n\x1b[90m— claude session exited (${payload.exitCode}) —\x1b[0m\r\n`);
-      }
-    });
-
-    // Spawn (or re-attach and replay) the PTY. A known externalId means we
-    // resume that Claude Code session rather than starting a fresh one.
-    void api.terminal.attach({
-      runId,
-      cwd: run.cwd,
-      cols: term.cols,
-      rows: term.rows,
-      resume: run.externalId,
-    });
-
-    const resize = new ResizeObserver(() => {
+    // A hidden host measures 0×0; fitting then would shrink the PTY to nothing.
+    const refit = () => {
+      if (!host.offsetWidth || !host.offsetHeight) return;
       try {
         fit.fit();
-        api.terminal.resize({ runId, cols: term.cols, rows: term.rows });
+        api.terminal.resize({ terminalId, cols: term.cols, rows: term.rows });
       } catch {
         /* host detached mid-measure */
       }
-    });
-    resize.observe(host);
+    };
+    termRef.current = { term, refit };
+    if (host.offsetWidth && host.offsetHeight) fit.fit();
 
-    term.focus();
+    const keyDisposable = term.onData((data) => api.terminal.input(terminalId, data));
+    const offData = api.onTerminalData((payload) => {
+      if (payload.terminalId === terminalId) term.write(payload.data);
+    });
+    const offExit = api.onTerminalExit((payload) => {
+      if (payload.terminalId === terminalId) {
+        term.write(`\r\n\x1b[90m${exitNoteRef.current(payload.exitCode)}\x1b[0m\r\n`);
+      }
+    });
+
+    api.terminal
+      .attach({ terminalId, cols: term.cols, rows: term.rows })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        term.write(`\x1b[31mCould not start this terminal: ${message}\x1b[0m\r\n`);
+      });
+
+    const resize = new ResizeObserver(refit);
+    resize.observe(host);
 
     return () => {
       resize.disconnect();
       keyDisposable.dispose();
       offData();
       offExit();
+      termRef.current = null;
       term.dispose();
     };
-  }, [run.id, run.cwd]);
+  }, [terminalId]);
+
+  // Coming into view: size to the space it now has and take the keyboard.
+  useEffect(() => {
+    if (!visible || !termRef.current) return;
+    const { term, refit } = termRef.current;
+    const frame = requestAnimationFrame(() => {
+      refit();
+      term.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible]);
 
   return (
-    <>
-      <header className="transcript-head">
-        <h1>{run.title}</h1>
-        {run.externalId && (
-          <div className="subline">
-            <span className="path">{run.externalId.slice(0, 8)}</span>
-          </div>
-        )}
-      </header>
-      <div className="terminal-wrap">
-        <div className="terminal-host" ref={hostRef} />
-      </div>
-    </>
+    <div className="terminal-wrap">
+      <div className="terminal-host" ref={hostRef} />
+    </div>
   );
 }

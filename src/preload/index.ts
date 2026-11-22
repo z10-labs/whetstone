@@ -14,6 +14,7 @@ import {
 } from '@shared/ipc';
 import type { SpecReviewDetail } from '@shared/explain-pr';
 import type { BrainItem } from '@shared/brain';
+import type { DockTerminal } from '@shared/terminals';
 import type { AgentRun, RunEvent } from '@shared/models';
 
 const api: WhetstoneApi = {
@@ -51,9 +52,19 @@ const api: WhetstoneApi = {
   },
   terminal: {
     attach: (input) => ipcRenderer.invoke(IpcChannel.TerminalAttach, input),
-    input: (runId, data) => ipcRenderer.send(IpcChannel.TerminalInput, runId, data),
+    input: (terminalId, data) => ipcRenderer.send(IpcChannel.TerminalInput, terminalId, data),
     resize: (input) => ipcRenderer.send(IpcChannel.TerminalResize, input),
-    kill: (runId) => ipcRenderer.send(IpcChannel.TerminalKill, runId),
+    kill: (terminalId) => ipcRenderer.send(IpcChannel.TerminalKill, terminalId),
+  },
+  dock: {
+    list: () => ipcRenderer.invoke(IpcChannel.DockList),
+    create: (input) => ipcRenderer.invoke(IpcChannel.DockCreate, input),
+    restart: (id) => ipcRenderer.invoke(IpcChannel.DockRestart, id),
+    close: (id) => ipcRenderer.invoke(IpcChannel.DockClose, id),
+  },
+  hippomem: {
+    decisions: (cwd) => ipcRenderer.invoke(IpcChannel.HippomemDecisions, cwd),
+    query: (input) => ipcRenderer.invoke(IpcChannel.HippomemQuery, input),
   },
   explainPr: {
     list: () => ipcRenderer.invoke(IpcChannel.ExplainPrList),
@@ -82,6 +93,11 @@ const api: WhetstoneApi = {
     const handler = (_e: unknown, payload: TerminalExitPayload) => listener(payload);
     ipcRenderer.on(IpcEvent.TerminalExit, handler);
     return () => ipcRenderer.removeListener(IpcEvent.TerminalExit, handler);
+  },
+  onDockChanged: (listener) => {
+    const handler = (_e: unknown, terminals: DockTerminal[]) => listener(terminals);
+    ipcRenderer.on(IpcEvent.DockChanged, handler);
+    return () => ipcRenderer.removeListener(IpcEvent.DockChanged, handler);
   },
   onBrainChanged: (listener) => {
     const handler = (_e: unknown, items: BrainItem[]) => listener(items);
