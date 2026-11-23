@@ -3,7 +3,7 @@
  * binding source lines, and the "finished 2h ago" footer.
  */
 
-import type { Binding } from '@shared/cards';
+import { intervalSec, type Binding } from '@shared/cards';
 
 const MINUTE = 60;
 const HOUR = 60 * MINUTE;
@@ -47,42 +47,15 @@ export function formatFinishedAgo(settledAt: number, now: number = Date.now()): 
 
 /** Dim footer source for a live binding, e.g. `gh run view · every 5s`. */
 export function bindingSourceLabel(binding: Binding): string {
+  const every = `every ${intervalSec(binding)}s`;
   switch (binding.kind) {
     case 'gh-run':
-      return `gh run view · every ${binding.everySec ?? 5}s`;
+      return `gh run view · ${every}`;
     case 'gh-pr':
-      return `gh pr view · every ${binding.everySec ?? 30}s`;
+      return `gh pr view · ${every}`;
     case 'command':
-      return `command · every ${binding.everySec}s`;
+      return `command · ${every}`;
     case 'file':
-      return 'file';
-  }
-}
-
-/** What the approval strip quotes: the command or path being gated. */
-export function bindingApprovalTarget(binding: Binding): string {
-  switch (binding.kind) {
-    case 'command':
-      return binding.command;
-    case 'file':
-      return binding.path;
-    case 'gh-run':
-      return `gh run view ${binding.runId}`;
-    case 'gh-pr':
-      return `gh pr view ${binding.pr}`;
-  }
-}
-
-/** Poll interval for the approval copy, when the binding has one. */
-export function bindingEverySec(binding: Binding): number | null {
-  switch (binding.kind) {
-    case 'gh-run':
-      return binding.everySec ?? 5;
-    case 'gh-pr':
-      return binding.everySec ?? 30;
-    case 'command':
-      return binding.everySec;
-    case 'file':
-      return binding.everySec ?? null;
+      return `file · ${every}`;
   }
 }

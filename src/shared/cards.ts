@@ -54,7 +54,7 @@ const blockSchema = z.discriminatedUnion('kind', [
     value: val(z.union([z.string(), z.number()])),
     format: z.enum(['duration', 'count', 'percent']).optional(),
     note: val(z.string()).optional(),
-    tone: toneSchema.optional(),
+    tone: val(toneSchema).optional(),
   }),
   z.object({
     kind: z.literal('progress'),
@@ -132,6 +132,33 @@ const bindingSchema = z.discriminatedUnion('kind', [
 ]);
 export type Binding = z.infer<typeof bindingSchema>;
 export type BindingKind = Binding['kind'];
+
+const DEFAULT_EVERY_SEC: Record<BindingKind, number> = {
+  'gh-run': 5,
+  'gh-pr': 30,
+  file: 10,
+  command: 30,
+};
+
+/** How often a binding polls when on screen. */
+export function intervalSec(binding: Binding): number {
+  const every = 'everySec' in binding && binding.everySec ? binding.everySec : null;
+  return Math.max(MIN_POLL_SEC, every ?? DEFAULT_EVERY_SEC[binding.kind]);
+}
+
+/** One line naming what a binding runs or reads (approval strip, footers). */
+export function describeBindingTarget(binding: Binding): string {
+  switch (binding.kind) {
+    case 'command':
+      return binding.command;
+    case 'file':
+      return binding.path;
+    case 'gh-run':
+      return `gh run view ${binding.runId} --repo ${binding.repo}`;
+    case 'gh-pr':
+      return `gh pr view ${binding.pr} --repo ${binding.repo}`;
+  }
+}
 
 const triggerSchema = z.object({
   path: z.string().startsWith('/'),

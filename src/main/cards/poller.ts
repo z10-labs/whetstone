@@ -7,12 +7,7 @@
  * Storage, broadcasting and waking are injected; the poller only schedules.
  */
 
-import {
-  MIN_POLL_SEC,
-  type Binding,
-  type BindingKind,
-  type LiveCard,
-} from '@shared/cards';
+import { intervalSec, type BindingKind, type LiveCard } from '@shared/cards';
 import type { Adapter, AdapterContext } from './adapters/types';
 import { firedTriggers, isSettled } from './triggers';
 import type { CardPatchInput } from '../repo/cards';
@@ -23,18 +18,6 @@ const ERROR_LIMIT = 3;
 const ERROR_RETRY_SEC = 60;
 /** Interval multiplier for cards nobody is looking at. */
 const OFFSCREEN_BACKOFF = 4;
-
-const DEFAULT_EVERY_SEC: Record<BindingKind, number> = {
-  'gh-run': 5,
-  'gh-pr': 30,
-  file: 10,
-  command: 30,
-};
-
-export function intervalSec(binding: Binding): number {
-  const every = 'everySec' in binding && binding.everySec ? binding.everySec : null;
-  return Math.max(MIN_POLL_SEC, every ?? DEFAULT_EVERY_SEC[binding.kind]);
-}
 
 export interface Viewing {
   focused: boolean;

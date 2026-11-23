@@ -62,6 +62,6 @@ describe('bindingSourceLabel', () => {
     );
     const cmd: Binding = { kind: 'command', command: 'npm run stats', everySec: 20 };
     expect(bindingSourceLabel(cmd)).toBe('command · every 20s');
-    expect(bindingSourceLabel({ kind: 'file', path: '/tmp/x', parse: 'json' })).toBe('file');
+    expect(bindingSourceLabel({ kind: 'file', path: '/tmp/x', parse: 'json' })).toBe('file · every 10s');
   });
 });

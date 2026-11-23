@@ -31,17 +31,3 @@ export function bindingNeedsApproval(binding: Binding, cwd: string | null): bool
     }
   }
 }
-
-/** The one line the approval strip shows: what will run, or what will be read. */
-export function describeBindingTarget(binding: Binding): string {
-  switch (binding.kind) {
-    case 'command':
-      return binding.command;
-    case 'file':
-      return binding.path;
-    case 'gh-run':
-      return `gh run view ${binding.runId} --repo ${binding.repo}`;
-    case 'gh-pr':
-      return `gh pr view ${binding.pr} --repo ${binding.repo}`;
-  }
-}

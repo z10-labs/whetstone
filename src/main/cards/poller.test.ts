@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { CardPoller, intervalSec, isOnScreen, type PollerDeps } from './poller';
+import { CardPoller, isOnScreen, type PollerDeps } from './poller';
+import { intervalSec } from '@shared/cards';
 import type { CardPatchInput } from '../repo/cards';
 import type { LiveCard } from '@shared/cards';
 

@@ -1,11 +1,9 @@
 import type { DragEvent } from 'react';
-import { isPinned, type LiveCard } from '@shared/cards';
+import { describeBindingTarget, intervalSec, isPinned, type LiveCard } from '@shared/cards';
 import type { CardActionInput } from '@shared/ipc';
 import { api } from '../../lib/api';
 import { CardBlock } from './blocks';
 import {
-  bindingApprovalTarget,
-  bindingEverySec,
   bindingSourceLabel,
   formatFinishedAgo,
 } from './format';
@@ -141,10 +139,8 @@ export function LiveCardView({
           <div className="live-approve">
             <p>
               Allow this card to run{' '}
-              <code>{bindingApprovalTarget(card.spec.binding)}</code>
-              {bindingEverySec(card.spec.binding) != null && (
-                <> every {bindingEverySec(card.spec.binding)}s</>
-              )}
+              <code>{describeBindingTarget(card.spec.binding)}</code> every{' '}
+              {intervalSec(card.spec.binding)}s
               ?
             </p>
             <button
