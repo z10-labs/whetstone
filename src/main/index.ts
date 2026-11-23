@@ -10,6 +10,7 @@ import { registerIpc } from './ipc';
 import { killAllTerminals } from './terminal/manager';
 import { stopAllTails } from './terminal/tail';
 import { stopReminderTicker } from './brain/reminders';
+import { setFocused, stopCards } from './cards/service';
 
 const isDev = !app.isPackaged;
 
@@ -62,6 +63,10 @@ app.whenReady().then(async () => {
   createWindow();
   console.log('[whetstone] ready — db bootstrapped, ipc registered, window created');
 
+  // Off-screen cards poll slower while the app is in the background.
+  app.on('browser-window-focus', () => setFocused(true));
+  app.on('browser-window-blur', () => setFocused(false));
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -73,6 +78,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   stopReminderTicker();
+  stopCards();
   stopAllTails();
   killAllTerminals();
   closeDb();

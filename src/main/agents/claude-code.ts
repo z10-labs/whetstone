@@ -17,6 +17,7 @@
 import { z } from 'zod';
 import type { AgentProvider, LaunchParams, NormalizedAgentEvent } from './types';
 import { MEMORY_KINDS } from '@shared/session-memory';
+import { cardPatchSchema, cardSpecSchema } from '@shared/cards';
 
 /**
  * In-process whetstone tools render as dedicated UI (question cards, memory
@@ -28,7 +29,26 @@ const SUPPRESSED_TOOLS = new Set([
   'mcp__whetstone__remember',
   'mcp__whetstone__recall',
   'mcp__whetstone__brain',
+  'mcp__whetstone__card',
 ]);
+
+const CARD_TOOL_DESCRIPTION =
+  'Put a Live Card in the human\'s sidebar: a small UI for something that changes while ' +
+  'they work (a CI run, a long job, a PR, an approval you need, a decision or hypotheses ' +
+  'you are weighing). Describe it once; Whetstone keeps it fresh from its `binding` without ' +
+  'you, and resumes you with a message when a `wakeOn` trigger fires — so end your turn ' +
+  'instead of polling. Block values are literals or `{ "$bind": "/json/pointer" }` into the ' +
+  'binding\'s state. `gh-run` state: status, conclusion, workflow, title, branch, sha, url, ' +
+  'elapsedSec, typicalSec, overrunLabel, overrunTone, jobs (steps), currentJob, logTail. ' +
+  'A typical CI card: stat(value $bind /elapsedSec, format duration, note $bind /overrunLabel), ' +
+  'budget(value /elapsedSec, reference /typicalSec, limit 2100, unit sec), steps(/jobs), ' +
+  'log(/logTail), wakeOn [{path:/conclusion, op:eq, value:failure, note:"run failed"}, ' +
+  '{path:/elapsedSec, op:gt, value:2100, note:"passed 35 min"}]. `gh-pr` state: number, ' +
+  'title, url, state, review, checks, checksPassed, checksTotal, checksRunning, unresolved, ' +
+  'conflicts, summary. Use `tone: attention` plus an `actions` block when you need the ' +
+  'human to approve something; their click comes back to you as a message. Set ' +
+  '`suggestPin` on cards worth keeping after this session. `update` replaces fields (not ' +
+  'the binding); `close` stops a card. Ids look like id:3fa9c1. You cannot pin cards.';
 
 /** zod enum for a memory kind, derived from the shared list. */
 const memoryKindEnum = z.enum(MEMORY_KINDS as [string, ...string[]]);
@@ -63,7 +83,7 @@ export const claudeCodeProvider: AgentProvider = {
 
   async *launch(params: LaunchParams): AsyncIterable<NormalizedAgentEvent> {
     const sdk = await loadSdk();
-    const { askUser, remember, recall, brain } = params;
+    const { askUser, remember, recall, brain, card } = params;
 
     // Track suppressed tool-call ids so we can drop their raw tool_use /
     // tool_result echoes — richer events (ask/answer, memory) represent them.
@@ -200,6 +220,37 @@ export const claudeCodeProvider: AgentProvider = {
               id: input.id,
             });
             return { content: [{ type: 'text', text }] };
+          },
+        ),
+      );
+    }
+
+    if (card) {
+      tools.push(
+        sdk.tool(
+          'card',
+          CARD_TOOL_DESCRIPTION,
+          {
+            action: z.enum(['create', 'update', 'close']),
+            spec: cardSpecSchema.optional().describe('For create: the whole card.'),
+            id: z.string().optional().describe('For update and close: the card id, e.g. id:3fa9c1.'),
+            patch: cardPatchSchema
+              .optional()
+              .describe('For update: fields to replace. blocks and wakeOn replace wholesale.'),
+          },
+          async (input) => {
+            try {
+              const text = await card({
+                action: input.action,
+                spec: input.spec,
+                id: input.id,
+                patch: input.patch,
+              });
+              return { content: [{ type: 'text', text }] };
+            } catch (err) {
+              const text = err instanceof Error ? err.message : String(err);
+              return { content: [{ type: 'text', text }], isError: true };
+            }
           },
         ),
       );

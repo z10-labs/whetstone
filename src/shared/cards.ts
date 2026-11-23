@@ -169,7 +169,7 @@ export function describeSpecError(err: z.ZodError): string {
 // Stored card
 // ---------------------------------------------------------------------------
 
-export const CARD_STATUSES = ['live', 'settled', 'error', 'awaiting-approval', 'closed'] as const;
+export const CARD_STATUSES = ['live', 'settled', 'error', 'awaiting-approval'] as const;
 export type CardStatus = (typeof CARD_STATUSES)[number];
 
 /** At most this many pinned cards; pinning one more asks which to unpin. */

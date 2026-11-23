@@ -222,6 +222,41 @@ export const specFileDeps = sqliteTable(
   (t) => [index('spec_file_deps_file_idx').on(t.fileId)],
 );
 
+/**
+ * Live Cards (docs/live-cards.md). `spec` and `state` are JSON text: the spec
+ * is validated at the `card` tool boundary and the state is whatever the
+ * binding adapter produced, so neither earns columns of its own. An origin
+ * session's deletion nulls `origin_session_id`: a pinned card lives on as an
+ * orphan, an unpinned one is swept.
+ */
+export const liveCards = sqliteTable(
+  'live_cards',
+  {
+    id: text('id').primaryKey(),
+    originSessionId: text('origin_session_id').references(() => sessions.id, {
+      onDelete: 'set null',
+    }),
+    originRunId: text('origin_run_id').references(() => agentRuns.id, { onDelete: 'set null' }),
+    spec: text('spec').notNull(),
+    state: text('state'),
+    status: text('status').notNull().default('live'),
+    lastError: text('last_error'),
+    firedTriggers: text('fired_triggers').notNull().default('[]'),
+    bindingApprovedAt: integer('binding_approved_at'),
+    pinnedAt: integer('pinned_at'),
+    pinOrder: integer('pin_order'),
+    dismissedAt: integer('dismissed_at'),
+    settledAt: integer('settled_at'),
+    lastPolledAt: integer('last_polled_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [
+    index('live_cards_session_idx').on(t.originSessionId),
+    index('live_cards_pinned_idx').on(t.pinnedAt),
+  ],
+);
+
 export type SessionRow = typeof sessions.$inferSelect;
 export type AgentRunRow = typeof agentRuns.$inferSelect;
 export type RunEventRow = typeof runEvents.$inferSelect;
@@ -232,3 +267,4 @@ export type SpecGoalRow = typeof specGoals.$inferSelect;
 export type SpecFileRow = typeof specFiles.$inferSelect;
 export type SpecFileGoalRow = typeof specFileGoals.$inferSelect;
 export type SpecFileDepRow = typeof specFileDeps.$inferSelect;
+export type LiveCardRow = typeof liveCards.$inferSelect;

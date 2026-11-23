@@ -4,10 +4,12 @@
  * This is the only place `ipcMain` and `webContents` are touched.
  */
 
-import { ipcMain, BrowserWindow, dialog } from 'electron';
+import { ipcMain, BrowserWindow, Notification, dialog } from 'electron';
 import { IpcChannel, IpcEvent } from '@shared/ipc';
 import type {
   AnswerAgentInput,
+  CardActionInput,
+  CardsViewingInput,
   CreateRunInput,
   CreateSessionInput,
   SetReviewedInput,
@@ -29,7 +31,10 @@ import * as brainRepo from '../repo/brain';
 import { brainFilePath } from '../brain/mirror';
 import { publishBrain, setBrainBroadcaster } from '../brain/publish';
 import { startReminderTicker } from '../brain/reminders';
-import { startRun, cancelRun, submitAnswer } from '../agents/runner';
+import { startRun, cancelRun, submitAnswer, deliverToRun } from '../agents/runner';
+import * as cards from '../cards/service';
+import { listSessionCards } from '../repo/cards';
+import type { CardChange } from '@shared/cards';
 import * as explainPr from '../explain-pr/service';
 import {
   attachTerminal,
@@ -93,9 +98,11 @@ export function registerIpc(): void {
     sessionsRepo.updateSession(input),
   );
   ipcMain.handle(IpcChannel.SessionsDelete, async (_e, id: string) => {
+    const sessionCards = await listSessionCards(id, { includePinned: true });
     await brainRepo.removeMissionForSession(id);
     await sessionsRepo.deleteSession(id);
     await publishBrain();
+    await cards.sessionDeleted(sessionCards);
   });
 
   // Runs
@@ -239,6 +246,44 @@ export function registerIpc(): void {
   ipcMain.handle(IpcChannel.ExplainPrCancel, (_e, id: string) => {
     explainPr.cancelReview(id);
   });
+
+  // Live Cards. The service owns the poller; it is handed Electron's pieces
+  // here so nothing under cards/ imports Electron.
+  void cards
+    .initCards({
+      broadcast: (change: CardChange) => broadcast(IpcEvent.CardChanged, change),
+      deliver: (runId, text) => deliverToRun(runId, text, emitter),
+      notify: (title, body) => {
+        if (!Notification.isSupported()) return;
+        const n = new Notification({ title, body });
+        n.on('click', () => {
+          const win = BrowserWindow.getAllWindows()[0];
+          if (win) {
+            if (win.isMinimized()) win.restore();
+            win.focus();
+          }
+        });
+        n.show();
+      },
+      isFocused: () => BrowserWindow.getFocusedWindow() !== null,
+      onSessionCreated: async (sessionId, name) => {
+        await brainRepo.setMission({ sessionId, title: name, body: '' });
+        await publishBrain();
+      },
+    })
+    .catch((err) => console.error('[whetstone] card service failed to start:', err));
+
+  ipcMain.handle(IpcChannel.CardsList, (_e, sessionId: string | null) => cards.listView(sessionId));
+  ipcMain.handle(IpcChannel.CardsPin, (_e, id: string, replaceId?: string) => cards.pin(id, replaceId));
+  ipcMain.handle(IpcChannel.CardsUnpin, (_e, id: string) => cards.unpin(id));
+  ipcMain.handle(IpcChannel.CardsReorder, (_e, ids: string[]) => cards.reorder(ids));
+  ipcMain.handle(IpcChannel.CardsDismiss, (_e, id: string) => cards.dismiss(id));
+  ipcMain.handle(IpcChannel.CardsAction, (_e, input: CardActionInput) => cards.action(input));
+  ipcMain.handle(IpcChannel.CardsApproveBinding, (_e, id: string) => cards.approveBinding(id));
+  ipcMain.handle(IpcChannel.CardsStartSession, (_e, id: string, cwd: string) =>
+    cards.startSession(id, cwd),
+  );
+  ipcMain.on(IpcChannel.CardsSetViewing, (_e, input: CardsViewingInput) => cards.setViewing(input));
 
   // Native folder picker for choosing a run's working directory.
   ipcMain.handle(IpcChannel.DialogPickDirectory, async () => {
