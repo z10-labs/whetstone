@@ -12,6 +12,7 @@ import { getSessionWithRuns } from '../repo/sessions';
 import { listActiveBySession } from '../repo/session-memory';
 import { listBrainBySession } from '../repo/brain';
 import { brainLine } from '../brain/mirror';
+import { digestLines as cardLines } from '../cards/service';
 import { MEMORY_KINDS, MEMORY_KIND_LABELS, type MemoryKind } from '@shared/session-memory';
 import type { SessionMemoryEntry } from '@shared/session-memory';
 import type { AgentRun } from '@shared/models';
@@ -92,6 +93,14 @@ export async function compileDigest(
     for (const run of session.runs) lines.push(rosterLine(run, currentRunId));
   }
   lines.push('');
+
+  const cards = await cardLines(sessionId);
+  if (cards.length > 0) {
+    lines.push('## Live cards in this session');
+    lines.push('Whetstone keeps these fresh; update or close them with `card`.');
+    lines.push(...cards);
+    lines.push('');
+  }
 
   lines.push('## Shared memory');
   if (entries.length === 0) {

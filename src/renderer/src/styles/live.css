@@ -1,0 +1,718 @@
+/*
+ * Live Cards — the inspector's Live tab: self-updating cards an agent
+ * describes once and the host keeps fresh. Tokens only; no raw hex.
+ */
+
+.live {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.live-scroll {
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.live-error {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius);
+  background: var(--bg-inset);
+  font-size: var(--text-sm);
+  color: var(--err);
+}
+
+.live-empty {
+  margin: var(--sp-5) 0 0;
+  padding: 0 var(--sp-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.live-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* ---- Pin-cap chooser ---- */
+.live-cap {
+  padding: var(--sp-3);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.live-cap p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.45;
+}
+.live-cap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.live-cap-list .btn {
+  width: 100%;
+  text-align: left;
+}
+
+/* ---- Pinned section ---- */
+.live-pinned {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.live-pinned-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+.live-pinned-label {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.live-pinned-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+.live-pinned-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* ---- Card shell ---- */
+.live-card {
+  position: relative;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.live-card--attention {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+}
+.live-card.is-dragging {
+  opacity: 0.55;
+}
+.live-card.is-drop-target {
+  border-color: var(--accent);
+}
+
+/* Sweeping top strip while live + bound */
+.live-card--sweeping::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--run) 40%,
+    var(--run) 60%,
+    transparent 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: live-sweep 1.8s var(--ease) infinite;
+}
+@keyframes live-sweep {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-card--sweeping::before {
+    animation: none;
+    background: var(--run);
+    background-size: 100% 100%;
+  }
+}
+
+.live-card-head {
+  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+}
+.live-card-sub {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-bottom: var(--sp-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-card-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.live-card-title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-hi);
+  line-height: 1.3;
+}
+.live-card-needs {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--accent-hi);
+}
+.live-card-reorder {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.live-card:hover .live-card-reorder,
+.live-card:focus-within .live-card-reorder {
+  opacity: 1;
+}
+.live-icon-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1;
+}
+.live-icon-btn:hover:not(:disabled) {
+  color: var(--text-hi);
+  background: var(--bg-elevated);
+}
+.live-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.live-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.live-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+
+.live-approve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--accent-quiet);
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--line));
+  border-radius: var(--radius);
+}
+.live-approve p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.45;
+}
+.live-approve code {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-hi);
+}
+
+.live-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+.live-card-foot-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.live-card-foot-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  justify-content: flex-end;
+}
+.live-card-foot .btn {
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+}
+.live-card-hint {
+  font-size: var(--text-xs);
+  color: var(--accent-hi);
+  font-weight: 550;
+}
+.live-card-source {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-card-source.is-err {
+  color: var(--err);
+  white-space: normal;
+}
+
+.live-card-foot .btn:focus-visible,
+.live-approve .btn:focus-visible,
+.live-cap .btn:focus-visible,
+.live-choice-send:focus-visible,
+.live-action-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---- Tone helpers ---- */
+.live-card .live-tone-ok {
+  color: var(--ok);
+}
+.live-card .live-tone-run {
+  color: var(--run);
+}
+.live-card .live-tone-warn {
+  color: var(--warn);
+}
+.live-card .live-tone-err {
+  color: var(--err);
+}
+.live-card .live-tone-dim {
+  color: var(--text-dim);
+}
+
+/* ---- Blocks ---- */
+.live-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.live-stat-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 550;
+  color: var(--text-hi);
+  line-height: 1.15;
+}
+.live-stat-note {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.live-progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+.live-progress-pct {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.live-progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+.live-progress-fill {
+  height: 100%;
+  background: var(--run);
+  border-radius: 3px;
+}
+
+.live-budget-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+.live-budget-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.live-budget-fill--run {
+  background: var(--run);
+}
+.live-budget-fill--warn {
+  background: var(--warn);
+}
+.live-budget-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text-hi);
+  transform: translateX(-1px);
+}
+.live-budget-labels {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--sp-1);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  min-height: 1em;
+}
+.live-budget-usual {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.live-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.live-step {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.live-step.is-running {
+  background: var(--bg-elevated);
+}
+.live-step-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.live-step-detail {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+.live-step-mark {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+}
+.live-step-mark--done {
+  color: var(--ok);
+}
+.live-step-mark--failed {
+  color: var(--err);
+}
+.live-step-mark--running {
+  width: 8px;
+  height: 8px;
+  margin: 3px;
+  border-radius: 50%;
+  background: var(--run);
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+.live-step-mark--pending {
+  width: 8px;
+  height: 8px;
+  margin: 3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-dim);
+  background: transparent;
+}
+.live-step-mark--blocked {
+  width: 8px;
+  height: 8px;
+  margin: 3px;
+  border-radius: 1px;
+  background: var(--warn);
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-step-mark--running {
+    animation: none;
+  }
+}
+
+.live-kv {
+  display: grid;
+  gap: var(--sp-2) var(--sp-3);
+}
+.live-kv-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.live-kv-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-hi);
+}
+
+.live-sparkline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.live-sparkline-label {
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.live-log {
+  margin: 0;
+  padding: var(--sp-2);
+  background: var(--bg-inset);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.live-tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.live-tag {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.live-tag-pill {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+}
+.live-tag--likely .live-tag-pill {
+  color: var(--run);
+  border-color: color-mix(in oklab, var(--run) 45%, var(--line));
+}
+.live-tag--open .live-tag-pill {
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn) 45%, var(--line));
+}
+.live-tag--ruled-out .live-tag-pill {
+  color: var(--text-dim);
+}
+.live-tag--ruled-out .live-tag-text {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+.live-tag--done .live-tag-pill {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 45%, var(--line));
+}
+.live-tag-note {
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.live-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.live-option {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.live-option.is-leaning {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--line));
+}
+.live-option-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+.live-option-title {
+  font-weight: 550;
+  font-size: var(--text-sm);
+  color: var(--text-hi);
+}
+.live-option-leaning {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  color: var(--accent-hi);
+  padding: 1px 5px;
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--line));
+  border-radius: var(--radius-sm);
+}
+.live-option-pros,
+.live-option-cons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+.live-option-pros {
+  color: var(--ok);
+}
+.live-option-cons {
+  color: var(--err);
+}
+
+.live-choice {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.live-choice legend {
+  padding: 0 var(--sp-1);
+  font-size: var(--text-sm);
+  color: var(--text-hi);
+  font-weight: 550;
+}
+.live-choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0;
+}
+.live-choice-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.live-choice-send {
+  margin-top: var(--sp-1);
+}
+
+.live-markdown {
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.live-markdown .md {
+  font-size: inherit;
+}
+
+.live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.live-action-btn {
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  text-decoration: none;
+}
+.live-action-btn--danger {
+  color: var(--err);
+  border-color: color-mix(in oklab, var(--err) 45%, var(--line));
+}
+
+/* Transcript chip for a card event */
+.memory-chip--card {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  text-align: left;
+}
+.memory-chip--card:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.memory-chip--card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.memory-chip--card .memory-chip-mark {
+  color: var(--run);
+  display: inline-flex;
+}
+.memory-chip--card .memory-chip-kind {
+  color: var(--run);
+}
+
+/* Inspector body hosts the Live panel the same way as Session/Hippomem */
+.inspector-body > .live {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

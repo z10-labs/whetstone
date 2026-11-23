@@ -11,8 +11,11 @@
 import { randomUUID } from 'node:crypto';
 import { getProvider, DEFAULT_MODEL, DEFAULT_PERMISSION_MODE } from './registry';
 import { compileDigest } from './session-context';
-import type { BrainFn, RecallFn, RememberFn } from './types';
+import type { BrainFn, CardFn, RecallFn, RememberFn } from './types';
 import { applyBrainTool } from '../brain/agent-tool';
+import { applyCardTool } from '../cards/agent-tool';
+import { cardWritten } from '../cards/service';
+import type { CardEventData } from '@shared/cards';
 import { publishBrain } from '../brain/publish';
 import {
   appendEvent,
@@ -41,6 +44,31 @@ interface PendingAsk {
   resolve: (answer: string) => void;
 }
 const pendingAsks = new Map<string, PendingAsk>();
+
+/**
+ * Messages waiting for a busy run (a card trigger or a card button while the
+ * run is mid-turn). Delivered in order, one turn each, when the turn ends.
+ */
+interface Queued {
+  text: string;
+  emit: RunEmitter;
+}
+const inbox = new Map<string, Queued[]>();
+
+/**
+ * Send a message into a run as its next user turn: now if the run is idle,
+ * after the current turn if it is busy. Returns which happened.
+ */
+export function deliverToRun(runId: string, text: string, emit: RunEmitter): 'started' | 'queued' {
+  if (active.has(runId)) {
+    inbox.set(runId, [...(inbox.get(runId) ?? []), { text, emit }]);
+    return 'queued';
+  }
+  void startRun(runId, text, emit).catch((err) => {
+    console.error('[whetstone] deliverToRun failed:', err);
+  });
+  return 'started';
+}
 
 export function isActive(runId: string): boolean {
   return active.has(runId);
@@ -149,6 +177,28 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
       return ack;
     };
 
+    // Live Cards. A write starts polling and reaches every window via the
+    // card service, and leaves a `card` event in the transcript.
+    const card: CardFn = async (input) => {
+      const result = await applyCardTool(input, {
+        sessionId: run.sessionId,
+        runId,
+        cwd: run.cwd,
+      });
+      try {
+        cardWritten(result.card);
+        const data: CardEventData = {
+          cardId: result.card.id,
+          title: result.card.spec.title,
+          action: result.action,
+        };
+        emit.onEvent(await appendEvent(runId, { kind: 'card', text: data.title, data }));
+      } catch (err) {
+        console.error('[whetstone] card tool: write succeeded but publish failed:', err);
+      }
+      return result.ack;
+    };
+
     const provider = getProvider(run.provider);
     for await (const ev of provider.launch({
       prompt,
@@ -162,6 +212,7 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
       remember,
       recall,
       brain,
+      card,
     })) {
       if (ev.externalId && !externalStamped) {
         externalStamped = true;
@@ -196,5 +247,10 @@ export async function startRun(runId: string, prompt: string, emit: RunEmitter):
         pending.resolve('(run ended before this was answered)');
       }
     }
+    // Anything that arrived for this run while it was busy goes next.
+    const queue = inbox.get(runId);
+    const next = queue?.shift();
+    if (queue && queue.length === 0) inbox.delete(runId);
+    if (next) deliverToRun(runId, next.text, next.emit);
   }
 }

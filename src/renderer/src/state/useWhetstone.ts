@@ -31,11 +31,16 @@ export function useWhetstone() {
     setEvents(await api.runs.listEvents(run.id));
   }, []);
 
-  /** Selecting a session opens its most recent run, if it has one. */
+  /**
+   * Selecting a session opens its most recent run, if it has one.
+   * Pass `tree` when you've just refreshed and React hasn't re-rendered yet
+   * (e.g. starting a session from an orphan card).
+   */
   const selectSession = useCallback(
-    async (id: string) => {
+    async (id: string, tree?: SessionWithRuns[]) => {
+      const list = tree ?? sessions;
       setSelectedSessionId(id);
-      const latest = sessions.find((s) => s.id === id)?.runs.at(-1) ?? null;
+      const latest = list.find((s) => s.id === id)?.runs.at(-1) ?? null;
       setSelectedRunId(latest?.id ?? null);
       setEvents(latest ? await api.runs.listEvents(latest.id) : []);
     },
@@ -131,6 +136,7 @@ export function useWhetstone() {
     selectedRunId,
     selectedRun,
     events,
+    refreshSessions,
     selectSession,
     selectRun,
     createSession,

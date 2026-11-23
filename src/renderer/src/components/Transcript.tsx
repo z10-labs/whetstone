@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentRun, AskEventData, BrainEventData, MemoryEventData, RunEvent } from '@shared/models';
+import type { CardEventData } from '@shared/cards';
 import { QuestionCard } from './QuestionCard';
 import { Markdown } from './transcript/Markdown';
 import { ToolGroup } from './transcript/ToolGroup';
 import { groupTranscript } from './transcript/steps';
+import { CardIcon } from './icons';
 
 interface Props {
   run: AgentRun | null;
   events: RunEvent[];
   onAnswer: (questionId: string, answer: string) => void;
+  /** Open the Live tab and scroll to the card named by a transcript chip. */
+  onOpenCard?: (cardId: string) => void;
 }
 
 /**
@@ -16,7 +20,7 @@ interface Props {
  * box, Claude's replies as plain prose, and the work in between folded into
  * one line per stretch of tool calls.
  */
-export function Transcript({ run, events, onAnswer }: Props) {
+export function Transcript({ run, events, onAnswer, onOpenCard }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const items = useMemo(() => groupTranscript(events), [events]);
 
@@ -70,7 +74,7 @@ export function Transcript({ run, events, onAnswer }: Props) {
             />
           );
         }
-        return <EventView key={ev.id} event={ev} />;
+        return <EventView key={ev.id} event={ev} onOpenCard={onOpenCard} />;
       })}
       {live && (
         <div className="turn-working" aria-live="polite">
@@ -98,7 +102,24 @@ function Thinking({ text }: { text: string }) {
   );
 }
 
-function EventView({ event }: { event: RunEvent }) {
+function cardActionLabel(action: CardEventData['action']): string {
+  switch (action) {
+    case 'create':
+      return 'Card created';
+    case 'update':
+      return 'Card updated';
+    case 'close':
+      return 'Card closed';
+  }
+}
+
+function EventView({
+  event,
+  onOpenCard,
+}: {
+  event: RunEvent;
+  onOpenCard?: (cardId: string) => void;
+}) {
   switch (event.kind) {
     case 'user':
       return <div className="turn-user">{event.text}</div>;
@@ -145,6 +166,30 @@ function EventView({ event }: { event: RunEvent }) {
           <span className="memory-chip-kind">{d.kind.replace('_', ' ')}</span>
           <span className="memory-chip-title">{d.title || event.text}</span>
         </div>
+      );
+    }
+    case 'card': {
+      const d = (event.data as CardEventData | null) ?? {
+        cardId: '',
+        title: event.text ?? '',
+        action: 'create' as const,
+      };
+      const label = `${cardActionLabel(d.action)} · ${d.title || event.text || ''}`;
+      return (
+        <button
+          type="button"
+          className="memory-chip memory-chip--card"
+          title="Open in Live panel"
+          disabled={!d.cardId || !onOpenCard}
+          onClick={() => {
+            if (d.cardId && onOpenCard) onOpenCard(d.cardId);
+          }}
+        >
+          <span className="memory-chip-mark">
+            <CardIcon />
+          </span>
+          <span className="memory-chip-title">{label}</span>
+        </button>
       );
     }
     default:

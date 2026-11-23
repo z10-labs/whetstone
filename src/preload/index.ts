@@ -15,6 +15,7 @@ import {
 import type { SpecReviewDetail } from '@shared/explain-pr';
 import type { BrainItem } from '@shared/brain';
 import type { DockTerminal } from '@shared/terminals';
+import type { CardChange } from '@shared/cards';
 import type { AgentRun, RunEvent } from '@shared/models';
 
 const api: WhetstoneApi = {
@@ -73,6 +74,22 @@ const api: WhetstoneApi = {
     get: (id) => ipcRenderer.invoke(IpcChannel.ExplainPrGet, id),
     setReviewed: (input) => ipcRenderer.invoke(IpcChannel.ExplainPrSetReviewed, input),
     cancel: (id) => ipcRenderer.invoke(IpcChannel.ExplainPrCancel, id),
+  },
+  cards: {
+    list: (sessionId) => ipcRenderer.invoke(IpcChannel.CardsList, sessionId),
+    pin: (id, replaceId) => ipcRenderer.invoke(IpcChannel.CardsPin, id, replaceId),
+    unpin: (id) => ipcRenderer.invoke(IpcChannel.CardsUnpin, id),
+    reorder: (ids) => ipcRenderer.invoke(IpcChannel.CardsReorder, ids),
+    dismiss: (id) => ipcRenderer.invoke(IpcChannel.CardsDismiss, id),
+    action: (input) => ipcRenderer.invoke(IpcChannel.CardsAction, input),
+    approveBinding: (id) => ipcRenderer.invoke(IpcChannel.CardsApproveBinding, id),
+    startSession: (id, cwd) => ipcRenderer.invoke(IpcChannel.CardsStartSession, id, cwd),
+    setViewing: (input) => ipcRenderer.send(IpcChannel.CardsSetViewing, input),
+  },
+  onCardChanged: (listener) => {
+    const handler = (_e: unknown, change: CardChange) => listener(change);
+    ipcRenderer.on(IpcEvent.CardChanged, handler);
+    return () => ipcRenderer.removeListener(IpcEvent.CardChanged, handler);
   },
   onRunEvent: (listener) => {
     const handler = (_e: unknown, event: RunEvent) => listener(event);

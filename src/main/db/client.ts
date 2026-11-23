@@ -158,6 +158,27 @@ CREATE TABLE IF NOT EXISTS spec_file_deps (
   note    TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS spec_file_deps_file_idx ON spec_file_deps(file_id);
+
+CREATE TABLE IF NOT EXISTS live_cards (
+  id                  TEXT PRIMARY KEY,
+  origin_session_id   TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+  origin_run_id       TEXT REFERENCES agent_runs(id) ON DELETE SET NULL,
+  spec                TEXT NOT NULL,
+  state               TEXT,
+  status              TEXT NOT NULL DEFAULT 'live',
+  last_error          TEXT,
+  fired_triggers      TEXT NOT NULL DEFAULT '[]',
+  binding_approved_at INTEGER,
+  pinned_at           INTEGER,
+  pin_order           INTEGER,
+  dismissed_at        INTEGER,
+  settled_at          INTEGER,
+  last_polled_at      INTEGER,
+  created_at          INTEGER NOT NULL,
+  updated_at          INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS live_cards_session_idx ON live_cards(origin_session_id);
+CREATE INDEX IF NOT EXISTS live_cards_pinned_idx ON live_cards(pinned_at);
 `;
 
 /**
