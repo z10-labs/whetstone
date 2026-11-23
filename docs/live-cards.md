@@ -1,6 +1,6 @@
 # Whetstone — Live Cards
 
-> Status: **DRAFT for review**
+> Status: **Built (v1, 2026-11-23)**: all five milestones. See §13 for where the build differs from the draft.
 > Scope: a **Live panel** in the inspector where an agent can put small,
 > self-updating cards (a CI run, a long job, an approval, a decision it is
 > weighing), and where the human can **pin** the ones worth keeping so they
@@ -363,3 +363,14 @@ watching.
 3. **Orphan wake:** for an orphaned pinned card, is a notification plus "Start a
    session from this card" right, or should a trigger silently start a new
    session?
+
+## 13. Changes from the draft
+
+- **`choice` has no `send` field.** The picked option is the message.
+- **`stat.tone` can be bound** (`{ "$bind": "/overrunTone" }`), so a CI card's note turns amber or red by itself.
+- **Static cards are `live`** (they just never poll). `card close` sets `settled`; there is no separate `closed` status.
+- **`gh-run` log tail** is the lines leading up to the last `##[error]`, with runner noise (`##[group]`, `[command]`, env dumps, cleanup) removed.
+- **The allow-list splits pipes outside quotes** (`jq '.a | .b'` is one segment) and rejects `git … --output` / `--ext-diff`.
+- **Poll intervals and binding targets** live in `src/shared/cards.ts` (`intervalSec`, `describeBindingTarget`) so the footer and the poller agree.
+- **Notification clicks** focus the window but don't yet scroll to the card.
+

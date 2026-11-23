@@ -140,8 +140,7 @@ export function LiveCardView({
             <p>
               Allow this card to run{' '}
               <code>{describeBindingTarget(card.spec.binding)}</code> every{' '}
-              {intervalSec(card.spec.binding)}s
-              ?
+              {intervalSec(card.spec.binding)}s?
             </p>
             <button
               type="button"

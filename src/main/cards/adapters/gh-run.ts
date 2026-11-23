@@ -128,6 +128,37 @@ async function fetchTypical(
   }
 }
 
+/** Runner bookkeeping that never explains a failure. */
+const LOG_NOISE = /^(##\[(group|endgroup|warning|debug)\]|\[command\]|shell: |env:$|Post job cleanup|Cleaning up orphan)/;
+
+/**
+ * The lines that explain a failure: everything up to the last `##[error]`,
+ * minus runner noise, last few lines. `gh run view --log-failed` prefixes each
+ * line with `job<TAB>step<TAB>timestamp`, and keeps ANSI colours.
+ */
+export function failureTail(raw: string, max = LOG_TAIL_LINES): string[] {
+  const lines = raw.split('\n').map((l) =>
+    l
+      .replace(/^[^\t]*\t[^\t]*\t/, '')
+      .replace(/^\S+Z ?/, '')
+      // eslint-disable-next-line no-control-regex
+      .replace(/\x1b\[[0-9;]*m|\^\[\[[0-9;]*m/g, '')
+      .trimEnd(),
+  );
+  let end = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].startsWith('##[error]')) {
+      end = i;
+      break;
+    }
+  }
+  const window = end >= 0 ? lines.slice(0, end + 1) : lines;
+  return window
+    .filter((l) => l.trim() !== '' && !LOG_NOISE.test(l.trim()) && !/^\s{2}\w+: /.test(l))
+    .map((l) => l.replace(/^##\[error\]/, 'error: '))
+    .slice(-max);
+}
+
 async function fetchFailedLog(repo: string, runId: number, ctx: AdapterContext): Promise<string[]> {
   try {
     const out = await ctx.exec('gh', ['run', 'view', String(runId), '--repo', repo, '--log-failed'], {
@@ -135,11 +166,7 @@ async function fetchFailedLog(repo: string, runId: number, ctx: AdapterContext):
       maxBuffer: EXEC_MAX_BUFFER * 8,
       signal: ctx.signal,
     });
-    return out
-      .split('\n')
-      .map((l) => l.replace(/^[^\t]*\t[^\t]*\t/, '').replace(/^\S+Z /, '').trimEnd())
-      .filter((l) => l.trim() !== '')
-      .slice(-LOG_TAIL_LINES);
+    return failureTail(out);
   } catch {
     return [];
   }

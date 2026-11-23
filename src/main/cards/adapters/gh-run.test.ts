@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { formatDuration, ghRunAdapter, jobToStep, median, type GhRunState } from './gh-run';
+import { failureTail, formatDuration, ghRunAdapter, jobToStep, median, type GhRunState } from './gh-run';
 import type { AdapterContext, ExecFn } from './types';
 
 const NOW = Date.parse('2026-11-23T10:28:14Z');
@@ -54,6 +54,36 @@ describe('helpers', () => {
     expect(jobToStep({ name: 'a', status: 'completed', conclusion: 'failure' }, NOW).status).toBe('failed');
     expect(jobToStep({ name: 'a', status: 'completed', conclusion: 'skipped' }, NOW).tone).toBe('dim');
     expect(jobToStep({ name: 'a', status: 'waiting' }, NOW).status).toBe('pending');
+  });
+});
+
+describe('failureTail', () => {
+  const P = 'build\tUNKNOWN STEP\t2026-11-22T21:23:42.0000000Z ';
+  const log = [
+    `${P}##[group]Run pnpm format:check`,
+    `${P}shell: /usr/bin/bash -e {0}`,
+    `${P}env:`,
+    `${P}  PNPM_HOME: /home/runner/setup-pnpm`,
+    `${P}##[endgroup]`,
+    `${P}Checking formatting...`,
+    `${P}[\x1b[33mwarn\x1b[39m] modules/meetings/queries.ts`,
+    `${P} ELIFECYCLE  Command failed with exit code 1.`,
+    `${P}##[error]Process completed with exit code 1.`,
+    `${P}Post job cleanup.`,
+    `${P}[command]/usr/bin/git config --local --unset-all x`,
+  ].join('\n');
+
+  test('keeps what explains the failure and drops runner noise', () => {
+    expect(failureTail(log)).toEqual([
+      'Checking formatting...',
+      '[warn] modules/meetings/queries.ts',
+      ' ELIFECYCLE  Command failed with exit code 1.',
+      'error: Process completed with exit code 1.',
+    ]);
+  });
+
+  test('without an error marker it falls back to the filtered tail', () => {
+    expect(failureTail(`${P}one\n${P}[command]x\n${P}two`, 1)).toEqual(['two']);
   });
 });
 

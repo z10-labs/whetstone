@@ -308,19 +308,19 @@
 }
 
 /* ---- Tone helpers ---- */
-.live-tone-ok {
+.live-card .live-tone-ok {
   color: var(--ok);
 }
-.live-tone-run {
+.live-card .live-tone-run {
   color: var(--run);
 }
-.live-tone-warn {
+.live-card .live-tone-warn {
   color: var(--warn);
 }
-.live-tone-err {
+.live-card .live-tone-err {
   color: var(--err);
 }
-.live-tone-dim {
+.live-card .live-tone-dim {
   color: var(--text-dim);
 }
 
