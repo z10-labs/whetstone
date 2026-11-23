@@ -69,7 +69,9 @@ export type RunEventKind =
   /** The run wrote to the shared session brain via the `remember` tool. */
   | 'memory'
   /** The run wrote to the human's Brain via the `brain` tool. */
-  | 'brain';
+  | 'brain'
+  /** The run created, updated or closed a Live Card via the `card` tool. */
+  | 'card';
 
 /** The `data` shape stored on a `brain` RunEvent. */
 export interface BrainEventData {

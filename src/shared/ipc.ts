@@ -15,6 +15,7 @@ import type { SessionMemoryEntry } from './session-memory';
 import type { BrainItem, CaptureBrainInput, SetMissionInput, UpdateBrainInput } from './brain';
 import type { CreateDockTerminalInput, DockTerminal } from './terminals';
 import type { HippomemQueryInput, HippomemView } from './hippomem';
+import type { CardChange, LiveCard, LiveCardsView } from './cards';
 
 /** Channel names for request/response (ipcRenderer.invoke) calls. */
 export const IpcChannel = {
@@ -54,6 +55,15 @@ export const IpcChannel = {
   ExplainPrGet: 'explain-pr:get',
   ExplainPrSetReviewed: 'explain-pr:set-reviewed',
   ExplainPrCancel: 'explain-pr:cancel',
+  CardsList: 'cards:list',
+  CardsPin: 'cards:pin',
+  CardsUnpin: 'cards:unpin',
+  CardsReorder: 'cards:reorder',
+  CardsDismiss: 'cards:dismiss',
+  CardsAction: 'cards:action',
+  CardsApproveBinding: 'cards:approve-binding',
+  CardsStartSession: 'cards:start-session',
+  CardsSetViewing: 'cards:set-viewing',
 } as const;
 
 /** Channel names for main → renderer streaming (webContents.send). */
@@ -72,6 +82,8 @@ export const IpcEvent = {
   ExplainPrUpdated: 'stream:explain-pr-updated',
   /** The brain changed — carries the whole board, which is small by design. */
   BrainChanged: 'stream:brain-changed',
+  /** A Live Card changed (new state, pinned, settled) or was removed. */
+  CardChanged: 'stream:card-changed',
 } as const;
 
 export interface CreateSessionInput {
@@ -143,6 +155,28 @@ export interface SetReviewedInput {
   reviewId: string;
   path: string;
   reviewed: boolean;
+}
+
+/**
+ * A human acting on a card: a `send` action's label, or the option picked in
+ * a `choice` block. Main delivers it to the card's origin run.
+ */
+export interface CardActionInput {
+  cardId: string;
+  /** Which block the action came from (index into spec.blocks). */
+  blockIndex: number;
+  /** The action label, or the picked choice option. */
+  value: string;
+}
+
+/** Result of pinning: either pinned, or the cap was hit. */
+export type PinResult = { ok: true; card: LiveCard } | { ok: false; reason: 'cap'; pinned: LiveCard[] };
+
+/** What the Live panel is showing, so off-screen cards can poll slower. */
+export interface CardsViewingInput {
+  sessionId: string | null;
+  /** Whether the Live tab is the open inspector tab. */
+  panelOpen: boolean;
 }
 
 /**
@@ -224,6 +258,28 @@ export interface WhetstoneApi {
     setReviewed(input: SetReviewedInput): Promise<SpecReviewDetail>;
     cancel(id: string): Promise<void>;
   };
+  cards: {
+    /** The session's cards plus every pinned card. sessionId null = pinned only. */
+    list(sessionId: string | null): Promise<LiveCardsView>;
+    /** Pin a card. At the cap, returns the pinned set so the UI can ask which to drop. */
+    pin(id: string, replaceId?: string): Promise<PinResult>;
+    /** Back to its origin session, or dismissed if that session is gone. */
+    unpin(id: string): Promise<void>;
+    /** New order for the pinned section, first to last. */
+    reorder(ids: string[]): Promise<void>;
+    /** Remove everywhere and stop polling. */
+    dismiss(id: string): Promise<void>;
+    /** A button or choice on a card: sends a message to the origin run. */
+    action(input: CardActionInput): Promise<void>;
+    /** Allow a command/file binding to start polling. */
+    approveBinding(id: string): Promise<LiveCard>;
+    /** Orphan card: open a new session seeded with the card. Returns the session id. */
+    startSession(id: string, cwd: string): Promise<string>;
+    /** Report what the Live panel shows so polling can back off. */
+    setViewing(input: CardsViewingInput): void;
+  };
+  /** Subscribe to Live Card changes. Returns an unsubscribe function. */
+  onCardChanged(listener: (change: CardChange) => void): () => void;
   /** Subscribe to live run events. Returns an unsubscribe function. */
   onRunEvent(listener: (event: RunEvent) => void): () => void;
   /** Subscribe to run metadata updates. Returns an unsubscribe function. */
