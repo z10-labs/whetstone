@@ -1,26 +1,46 @@
 import type { ReactNode } from 'react';
 
-export type InspectorTab = 'session' | 'hippomem';
+export type InspectorTab = 'live' | 'session' | 'hippomem';
 
 interface Props {
   tab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
+  liveCount: number;
   sessionCount: number;
   onClose: () => void;
+  live: ReactNode;
   session: ReactNode;
   hippomem: ReactNode;
 }
 
 /**
- * The right-hand Memory panel. Two memories, deliberately side by side:
- * the Session's working memory (what these runs have decided and left open)
- * and Hippomem (why the repo is built the way it is, across every Session).
+ * The right-hand Memory panel. Three surfaces side by side: Live (things
+ * still happening), Session (what these runs have decided), and Hippomem
+ * (why the repo is built the way it is).
  */
-export function Inspector({ tab, onTab, sessionCount, onClose, session, hippomem }: Props) {
+export function Inspector({
+  tab,
+  onTab,
+  liveCount,
+  sessionCount,
+  onClose,
+  live,
+  session,
+  hippomem,
+}: Props) {
   return (
     <aside className="inspector" aria-label="Memory">
       <div className="inspector-head">
         <div className="pane-tabs" role="tablist" aria-label="Memory">
+          <button
+            role="tab"
+            aria-selected={tab === 'live'}
+            className={tab === 'live' ? 'is-active' : ''}
+            onClick={() => onTab('live')}
+          >
+            Live
+            {liveCount > 0 && <span className="tab-count">{liveCount}</span>}
+          </button>
           <button
             role="tab"
             aria-selected={tab === 'session'}
@@ -44,7 +64,7 @@ export function Inspector({ tab, onTab, sessionCount, onClose, session, hippomem
         </button>
       </div>
       <div className="inspector-body" role="tabpanel">
-        {tab === 'session' ? session : hippomem}
+        {tab === 'live' ? live : tab === 'session' ? session : hippomem}
       </div>
     </aside>
   );

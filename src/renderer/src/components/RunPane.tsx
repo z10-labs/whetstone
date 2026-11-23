@@ -18,6 +18,7 @@ interface Props {
   onAnswer: (questionId: string, answer: string) => void;
   onSend: (prompt: string) => void;
   onCancel: () => void;
+  onOpenCard?: (cardId: string) => void;
 }
 
 type View = 'terminal' | 'transcript';
@@ -36,6 +37,7 @@ export function RunPane({
   onAnswer,
   onSend,
   onCancel,
+  onOpenCard,
 }: Props) {
   const [view, setView] = useState<View>('terminal');
 
@@ -133,7 +135,7 @@ export function RunPane({
       )}
       {!showTerminal && (
         <>
-          <Transcript run={run} events={events} onAnswer={onAnswer} />
+          <Transcript run={run} events={events} onAnswer={onAnswer} onOpenCard={onOpenCard} />
           {!isTerminal && <PromptBar run={run} onSend={onSend} onCancel={onCancel} />}
         </>
       )}
