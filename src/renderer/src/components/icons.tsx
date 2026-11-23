@@ -63,3 +63,13 @@ export function MemoryIcon() {
     </svg>
   );
 }
+
+/** Compact card mark for the transcript chip. */
+export function CardIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden>
+      <rect x="2.5" y="3.5" width="11" height="9" rx="1.5" {...STROKE} />
+      <path d="M5 7h6M5 9.5h4" {...STROKE} strokeLinecap="round" />
+    </svg>
+  );
+}

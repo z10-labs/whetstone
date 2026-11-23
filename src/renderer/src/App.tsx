@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useWhetstone } from './state/useWhetstone';
 import { useExplainPr } from './state/useExplainPr';
 import { useSessionMemory } from './state/useSessionMemory';
+import { useLiveCards } from './state/useLiveCards';
 import { sessionBoard, useBrain } from './state/useBrain';
 import { useDock } from './state/useDock';
 import { usePreference } from './state/usePreference';
@@ -13,6 +14,7 @@ import { TerminalDock } from './components/TerminalDock';
 import { Inspector, type InspectorTab } from './components/Inspector';
 import { SessionBrain } from './components/SessionBrain';
 import { HippomemPanel } from './components/HippomemPanel';
+import { LivePanel } from './components/live/LivePanel';
 import { BrainPage } from './components/brain/BrainPage';
 import { ExplainPrPage } from './components/explain-pr/ExplainPrPage';
 
@@ -39,6 +41,10 @@ function ownedByTerminal(e: KeyboardEvent): boolean {
   return !IS_MAC && e.target instanceof Element && Boolean(e.target.closest('.xterm'));
 }
 
+function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export default function App() {
   const store = useWhetstone();
   const explain = useExplainPr();
@@ -53,6 +59,9 @@ export default function App() {
   const [dockHeight, setDockHeight] = usePreference('dockHeight', DEFAULT_DOCK_HEIGHT);
   const [memoryOpen, setMemoryOpen] = usePreference('memoryOpen', false);
   const [inspectorTab, setInspectorTab] = usePreference<InspectorTab>('inspectorTab', 'session');
+
+  const livePanelOpen = memoryOpen && inspectorTab === 'live';
+  const live = useLiveCards(store.selectedSessionId, livePanelOpen);
 
   const session = store.selectedSession;
   const run = store.selectedRun;
@@ -109,6 +118,35 @@ export default function App() {
     void store.selectSession(sessionId);
   };
 
+  const openCard = (cardId: string) => {
+    setView('sessions');
+    setMemoryOpen(true);
+    setInspectorTab('live');
+    const scroll = () => {
+      const el = document.getElementById(`card-${cardId}`);
+      if (!el) return false;
+      el.scrollIntoView({
+        block: 'nearest',
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      });
+      return true;
+    };
+    // Wait for the Live panel (and #card-*) to mount after state updates.
+    requestAnimationFrame(() => {
+      if (!scroll()) {
+        requestAnimationFrame(() => {
+          if (!scroll()) window.setTimeout(scroll, 50);
+        });
+      }
+    });
+  };
+
+  const selectSessionFromCard = async (sessionId: string) => {
+    const tree = await store.refreshSessions();
+    setView('sessions');
+    await store.selectSession(sessionId, tree);
+  };
+
   const runInDock = (command: string, cwd: string) => {
     setView('sessions');
     setDockOpen(true);
@@ -119,6 +157,8 @@ export default function App() {
   const crumbs = isSessions
     ? [session?.name ?? 'Sessions', ...(run ? [run.title] : [])]
     : [VIEW_NAMES[view]];
+
+  const liveCount = live.session.length + live.pinned.length;
 
   return (
     <div className={`app${sidebarOpen ? '' : ' no-sidebar'}`}>
@@ -169,6 +209,7 @@ export default function App() {
               onAnswer={store.answerQuestion}
               onSend={store.startAgent}
               onCancel={store.cancelAgent}
+              onOpenCard={openCard}
             />
             <TerminalDock
               dock={dock}
@@ -186,8 +227,23 @@ export default function App() {
             <Inspector
               tab={inspectorTab}
               onTab={setInspectorTab}
+              liveCount={liveCount}
               sessionCount={memory.entries.filter((e) => e.status !== 'superseded').length}
               onClose={() => setMemoryOpen(false)}
+              live={
+                <LivePanel
+                  session={live.session}
+                  pinned={live.pinned}
+                  pin={live.pin}
+                  unpin={live.unpin}
+                  reorder={live.reorder}
+                  dismiss={live.dismiss}
+                  action={live.action}
+                  approveBinding={live.approveBinding}
+                  startSession={live.startSession}
+                  onSelectSession={(id) => void selectSessionFromCard(id)}
+                />
+              }
               session={
                 store.selectedSessionId ? (
                   <SessionBrain
